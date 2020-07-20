@@ -1,0 +1,9 @@
+*tmp*
+*log*
+tune_para.py
+*.sh
+*.vscode
+*-workspace
+*__pycache__
+*.pdf
+*.bak
