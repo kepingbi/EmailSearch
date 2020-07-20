@@ -1,2 +1,2 @@
-# ProdSearch
-personalized product search with product reviews
+# EmailSearch
+personal search with users' history
