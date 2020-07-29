@@ -10,6 +10,7 @@ class DocContextBatch():
                  candi_doc_qcont_features, candi_doc_qdiscrete_features,
                  candi_doc_dcont_features, candi_doc_ddiscrete_features,
                  candi_doc_qdcont_features, candi_doc_popularity,
+                 candi_conv_occur, candi_doc_occur,
                  context_qidxs, context_pos_didxs,
                  context_qcont_features, context_qdiscrete_features,
                  context_pos_dcont_features, context_pos_ddiscrete_features,
@@ -25,6 +26,8 @@ class DocContextBatch():
         self.candi_doc_ddiscrete_features = candi_doc_ddiscrete_features
         self.candi_doc_qdcont_features = candi_doc_qdcont_features
         self.candi_doc_popularity = candi_doc_popularity
+        self.candi_conv_occur = candi_conv_occur
+        self.candi_doc_occur = candi_doc_occur
         self.context_qidxs = context_qidxs
         self.context_pos_didxs = context_pos_didxs
         self.context_qcont_features = context_qcont_features
@@ -48,6 +51,9 @@ class DocContextBatch():
         self.candi_doc_ddiscrete_features = torch.tensor(self.candi_doc_ddiscrete_features)
         self.candi_doc_qdcont_features = torch.tensor(self.candi_doc_qdcont_features)
         self.candi_doc_popularity = torch.tensor(self.candi_doc_popularity)
+        self.candi_conv_occur = torch.tensor(self.candi_conv_occur)
+        self.candi_doc_occur = torch.tensor(self.candi_doc_occur)
+
         self.context_qidxs = torch.tensor(self.context_qidxs)
         self.context_pos_didxs = torch.tensor(self.context_pos_didxs)
         self.context_qcont_features = torch.tensor(self.context_qcont_features)
@@ -70,6 +76,8 @@ class DocContextBatch():
             candi_doc_ddiscrete_features = self.candi_doc_ddiscrete_features.to(device)
             candi_doc_qdcont_features = self.candi_doc_qdcont_features.to(device).float()
             candi_doc_popularity = self.candi_doc_popularity.to(device)
+            candi_conv_occur = self.candi_conv_occur.to(device)
+            candi_doc_occur = self.candi_doc_occur.to(device)
             context_qidxs = self.context_qidxs.to(device)
             context_pos_didxs = self.context_pos_didxs.to(device)
             context_qcont_features = self.context_qcont_features.to(device).float()
@@ -85,6 +93,7 @@ class DocContextBatch():
                 candi_doc_qcont_features, candi_doc_qdiscrete_features,
                 candi_doc_dcont_features, candi_doc_ddiscrete_features,
                 candi_doc_qdcont_features, candi_doc_popularity,
+                candi_conv_occur, candi_doc_occur,
                 context_qidxs, context_pos_didxs,
                 context_qcont_features, context_qdiscrete_features,
                 context_pos_dcont_features, context_pos_ddiscrete_features,

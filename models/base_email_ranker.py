@@ -15,11 +15,11 @@ class BaseEmailRanker(nn.Module):
     g_qdiscrete_features = ["num_q_words", "num_q_operators", "item_type",
                             "locale_lcid", "culture_id", "query_lang_hash", "user_type"]
     g_doc_discrete_features = ["response_requested", "importance", "is_read",
-                               "flag_status", "email_class", "conversation_hash",
+                               "flag_status", "email_class", # "conversation_hash",
                                "subject_prefix_hash"]
     g_qdiscrete_feat_idx = {y:x for x, y in enumerate(g_qdiscrete_features)}
     g_doc_discrete_feat_idx = {y:x for x, y in enumerate(g_doc_discrete_features)}
-    g_operators_count = 5 # perhaps 5, but can be larger
+    g_operators_count = 10 # set to 10, otherwise cut
     def __init__(self, args, personal_data, device):
         super(BaseEmailRanker, self).__init__()
         self.args = args
@@ -29,7 +29,7 @@ class BaseEmailRanker(nn.Module):
         self.discrete_qfeat_emb_size = [10, 10, 10, 10, 10, 10, 30]
         # num_q_words, num_q_operators, item_type, locale_lcid, culture_id,
         # query_lang_hash, user_type (consumer or commercial)
-        self.discrete_dfeat_emb_size = [10, 10, 10, 10, 10, 5, 10]
+        self.discrete_dfeat_emb_size = [10, 10, 10, 10, 10, 10]
         self.embedding_size = self.args.embedding_size
         # response_requested, importance, is_read, flag_status, email_class
         # conversation_hash, subject_prefix_hash
@@ -64,7 +64,7 @@ class BaseEmailRanker(nn.Module):
             len(self.personal_data.user_types),
             self.discrete_qfeat_emb_size[self.g_qdiscrete_feat_idx['user_type']],
             padding_idx=0)
-        self.q_discrete_emb_dic = [self.num_qwords_emb, self.num_qoperatore_emb, \
+        self.q_discrete_emb_list = [self.num_qwords_emb, self.num_qoperatore_emb, \
             self.item_type_emb, self.locale_lcid_emb, self.culture_id_emb, \
                 self.query_lang_emb, self.user_type_emb]
         # embeddings for document discrete features
@@ -88,18 +88,18 @@ class BaseEmailRanker(nn.Module):
             len(self.personal_data.email_class_hashes),
             self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['email_class']],
             padding_idx=0)
-        self.conversation_hash_emb = nn.Embedding(
-            len(self.personal_data.conversation_hashes),
-            self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['conversation_hash']],
-            padding_idx=0)
+        # self.conversation_hash_emb = nn.Embedding(
+        #     len(self.personal_data.conversation_hashes),
+        #     self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['conversation_hash']],
+        #     padding_idx=0)
         self.subject_prefix_hash_emb = nn.Embedding(
             len(self.personal_data.subject_prefix_hashes),
             self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['subject_prefix_hash']],
             padding_idx=0)
-        # recent focus
-        self.d_discrete_emb_dic = [self.response_request_emb, self.importance_emb, \
+        self.d_discrete_emb_list = [self.response_request_emb, self.importance_emb, \
             self.is_read_emb, self.flag_emb, self.email_class_emb, \
-                self.conversation_hash_emb, self.subject_prefix_hash_emb]
+                self.subject_prefix_hash_emb]
+            # self.conversation_hash_emb, self.subject_prefix_hash_emb]
 
         self.qcont_W1 = nn.Linear(
             self.personal_data.qcont_feat_count, self.args.embedding_size//2)
@@ -112,8 +112,10 @@ class BaseEmailRanker(nn.Module):
         self.ddiscrete_W1 = nn.Linear(self.discrete_dfeat_hidden_size, int(self.embedding_size/2))
         self.emb_dropout = args.dropout
         self.attn_W1 = nn.Linear(self.embedding_size, self.embedding_size)
-        self.final_layer = nn.Linear(self.embedding_size, 1)
-
+        if self.args.qinteract:
+            self.qInteractFeatW = nn.Bilinear(self.embedding_size, self.embedding_size, 1)
+        else:
+            self.final_layer = nn.Linear(self.embedding_size, 1)
         self.dropout_layer = nn.Dropout(p=args.dropout)
 
         #for each q,u,i
@@ -181,9 +183,12 @@ class BaseEmailRanker(nn.Module):
 
         # collect the representation of the current query.
         # Current query features; current candidate documents;
-        scores = self.final_layer(aggr_candi_emb).squeeze(-1)
+        if self.args.qinteract:
+            scores = self.qInteractFeatW(candi_doc_q_hidden.contiguous(), aggr_candi_emb)
+        else:
+            scores = self.final_layer(aggr_candi_emb)
         # or dot product, probably not as good
-        scores = scores * candi_doc_mask
+        scores = scores.squeeze(-1) * candi_doc_mask
         return scores
 
     def self_attn_weighted_avg(self, doc_q_hidden, doc_d_hidden, doc_qdcont_hidden):
@@ -214,21 +219,22 @@ class BaseEmailRanker(nn.Module):
         doc_qdcont_hidden = torch.tanh(self.qdcont_W1(doc_qdcont_features))
         # batch_size, qdiscrete_feature_count
         # cat_qdiscret_list = []
-        # for idx in range(len(self.q_discrete_emb_dic)):
+        # for idx in range(len(self.q_discrete_emb_list)):
         #     print(idx)
-        #     cur_discrete_feat = self.q_discrete_emb_dic[idx](doc_qdiscrete_features[:, idx])
+        #     cur_discrete_feat = self.q_discrete_emb_list[idx](doc_qdiscrete_features[:, idx])
         #     cat_qdiscret_list.append(cur_discrete_feat)
         # doc_qdiscrete_mapped = torch.cat(cat_qdiscret_list, dim=-1)
 
-        doc_qdiscrete_mapped = torch.cat([self.q_discrete_emb_dic[idx](
+        doc_qdiscrete_mapped = torch.cat([self.q_discrete_emb_list[idx](
             doc_qdiscrete_features[:, idx]) for idx in range(
-                len(self.q_discrete_emb_dic))], dim=-1)
+                len(self.q_discrete_emb_list))], dim=-1)
         # batch_size, sum(discrete_qfeat_emb_size)
         doc_qdiscrete_hidden = torch.tanh(self.qdiscrete_W1(doc_qdiscrete_mapped))
         # batch_size, doc_count, self.embedding_size
-        doc_ddiscrete_mapped = torch.cat([self.d_discrete_emb_dic[idx](
+        doc_ddiscrete_mapped = torch.cat([self.d_discrete_emb_list[idx](
             doc_ddiscrete_features[:, :, idx]) for idx in range(
-                len(self.d_discrete_emb_dic))], dim=-1)
+                len(self.d_discrete_emb_list))], dim=-1)
+        # the last index conversation hash not used
         # concatenate with the popularity embedding
         doc_ddiscrete_hidden = torch.tanh(self.ddiscrete_W1(doc_ddiscrete_mapped))
         return doc_qcont_hidden, doc_dcont_hidden, doc_qdcont_hidden, \
@@ -253,10 +259,8 @@ class BaseEmailRanker(nn.Module):
         nn.init.normal_(self.is_read_emb.weight)
         nn.init.normal_(self.flag_emb.weight)
         nn.init.normal_(self.email_class_emb.weight)
-        nn.init.normal_(self.conversation_hash_emb.weight)
+        # nn.init.normal_(self.conversation_hash_emb.weight)
         nn.init.normal_(self.subject_prefix_hash_emb.weight)
-        # recent focus
-        # nn.init.normal_(self.rating_emb.weight)
 
         for name, p in self.named_parameters():
             if "W1.weight" in name:

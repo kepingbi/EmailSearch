@@ -348,8 +348,9 @@ class PersonalSearchData():
             feat_fname = "%s/extract_sample%.2f_feat_file.txt.gz" % (
                 args.input_dir, args.rnd_ratio)
         else:
-            feat_fname = "%s/extract_sample%.2f_hist_len%d_feat_file.txt.gz" % (
-                    args.input_dir, args.rnd_ratio, args.hist_len)
+            feat_fname = "%s/extract_sample%.2f_hist_len%d_feat_file.txt.gz" % ( \
+                args.input_dir, args.rnd_ratio, args.hist_len)
+        logger.info("Read %s" % feat_fname)
         self.feature_col_name, self.feature_name_dic, self.query_info_dic = \
             self.read_feature_file(feat_fname)
         self.u_queries_dic, self.user_idx_dic, self.user_idx_list \
@@ -373,7 +374,8 @@ class PersonalSearchData():
         ### dicrete document features (that need to be mapped)###
         self.subject_prefix_hash_idx_dic, self.subject_prefix_hashes = dict(), [-1]
         self.email_class_hash_idx_dic, self.email_class_hashes = dict(), [-1]
-        self.conversation_hash_idx_dic, self.conversation_hashes = dict(), [-1]
+        # self.conversation_hash_idx_dic, self.conversation_hashes = dict(), [-1]
+        # take huge memory but do not have positive effect
         line_no = 0
         q_info_dic = defaultdict(list)
         with gzip.open(fname, 'rt') as fin:
@@ -421,11 +423,11 @@ class PersonalSearchData():
                         self.email_class_hash_idx_dic[email_class_hash] \
                             = len(self.email_class_hashes)
                         self.email_class_hashes.append(email_class_hash)
-                    conversation_hash = int(segs[feat_name_dic['AdvancedPreferFeature_153']])
-                    if conversation_hash not in self.conversation_hash_idx_dic:
-                        self.conversation_hash_idx_dic[conversation_hash] \
-                            = len(self.conversation_hashes)
-                        self.conversation_hashes.append(conversation_hash)
+                    # conversation_hash = int(segs[feat_name_dic['AdvancedPreferFeature_153']])
+                    # if conversation_hash not in self.conversation_hash_idx_dic:
+                    #     self.conversation_hash_idx_dic[conversation_hash] \
+                    #         = len(self.conversation_hashes)
+                    #     self.conversation_hashes.append(conversation_hash)
 
             except Exception as e:
                 print("Error Message: {}".format(e))
@@ -457,11 +459,6 @@ class PersonalSearchData():
                 # the last element of the value list is the idx of qid in user's search sequence.
 
         return u_queries_dic, user_idx_dic, user_idx_list
-
-    def initialize_epoch(self):
-        #exlude padding idx
-        return
-
 
     # extract query-level features
     # document-level features ()
@@ -497,7 +494,7 @@ class PersonalSearchData():
         # 0 reserved for padding
         query_discrete_features.append(feature)
         feature = int(seg_features[feat_name_dic['QueryLevelFeature_1995']]) + 1
-        feature = feature if feature < 5 else 5
+        feature = feature if feature < 10 else 10
         # number of operators in a query
         query_discrete_features.append(feature)
         feature = int(seg_features[feat_name_dic['QueryLevelFeature_1997']])
@@ -552,10 +549,11 @@ class PersonalSearchData():
         doc_discrete_features.append(flag_status + 1)
         item_class_hash = int(seg_features[feat_name_dic['AdvancedPreferFeature_149']])
         doc_discrete_features.append(self.email_class_hash_idx_dic[item_class_hash])
-        conversation_hash = int(seg_features[feat_name_dic['AdvancedPreferFeature_153']])
-        doc_discrete_features.append(self.conversation_hash_idx_dic[conversation_hash])
         subject_prefix_hash = int(seg_features[feat_name_dic['AdvancedPreferFeature_156']])
         doc_discrete_features.append(self.subject_prefix_hash_idx_dic[subject_prefix_hash])
+        conversation_hash = int(seg_features[feat_name_dic['AdvancedPreferFeature_153']])
+        doc_discrete_features.append(conversation_hash)
+        # doc_discrete_features.append(self.conversation_hash_idx_dic[conversation_hash])
         return doc_cont_features, doc_discrete_features
 
     def collect_qd_matching_features(self, seg_features, feat_name_dic):

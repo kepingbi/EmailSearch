@@ -150,12 +150,22 @@ def main():
     parser.add_argument('--feat_file1', '-f1', default="/home/keping2/data/input/1_6_1_13_data.gz")
     parser.add_argument('--feat_file2', '-f2', default="")
     parser.add_argument('--data_path', '-data', default="")
+    parser.add_argument('--qutime_file', '-qut', default="")
+    parser.add_argument('--bin_count', '-bin', default=20, \
+        type=int, help="Bin count for drawing the figure")
     # /home/keping2/data/input/1_27_2_2_data.gz
     paras = parser.parse_args()
-    if os.path.exists(paras.data_path):
+    if os.path.exists(paras.qutime_file):
+        u_q_dic = defaultdict(set)
+        read_qid_file(paras.qutime_file, u_q_dic)
+        q_count_list = []
+        for uid in u_q_dic:
+            q_count_list.append(len(u_q_dic[uid]))
+        u_q_distribution(q_count_list, paras.qutime_file, paras.bin_count)
+    elif os.path.exists(paras.data_path): #partitioned data
         count_q_distr(paras.data_path, "valid")
         count_q_distr(paras.data_path, "test")
-    else:
+    else: # original feature file
         q_info_dic = defaultdict(list)
         read_feature_file(paras.feat_file1, q_info_dic)
         if os.path.exists(paras.feat_file2):

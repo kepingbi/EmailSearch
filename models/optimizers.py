@@ -144,7 +144,7 @@ class Optimizer(object):
                  adagrad_accum=0.0,
                  decay_method=None,
                  warmup_steps=4000,
-                 weight_decay = 0.
+                 weight_decay=0.
                  ):
         self.last_ppl = None
         self.learning_rate = learning_rate
@@ -231,9 +231,10 @@ class Optimizer(object):
 
         #if self.method != 'sparseadam':
         if self.decay_method == "noam" and self.method != 'sparseadam':
-            #only if we schedule the learning rate with noam decay, we set the learning rate
-            #otherwise we just use the original one by the optimizer
-            #revised by Keping
+            # only if we schedule the learning rate with noam decay, we set the learning rate
+            # otherwise we just use the original one by the optimizer
+            # revised by Keping
+            # in adam, the learning rate is not explicitly visible. 
             self.optimizer.param_groups[0]['lr'] = self.learning_rate
         #print("Number of parameter groups", len(self.optimizer.param_groups))
         #there are only one parameter groups in current model
@@ -241,5 +242,3 @@ class Optimizer(object):
         if self.max_grad_norm:
             clip_grad_norm_(self.params, self.max_grad_norm)
         self.optimizer.step()
-
-

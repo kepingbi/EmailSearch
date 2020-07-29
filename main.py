@@ -52,13 +52,17 @@ def parse_args():
                         help="The lambda for L2 regularization.")
     parser.add_argument("--hist_len", type=int, default=0,
                         help="The filter criteron of user queries in the training set.")
+    parser.add_argument("--filter_train", type=str2bool, nargs='?', const=True, default=False,
+                        help="Filter out some training qids by considering hist_len and rnd_ratio.")
+    parser.add_argument("--eval_train", type=str2bool, nargs='?', const=True, default=False,
+                        help="Evaluate performances on training set as well.")
     parser.add_argument("--batch_size", type=int, default=128,
                         help="Batch size to use during training.")
     parser.add_argument("--candi_doc_count", type=int, default=50, #
                         help="candidate documents for each query id. \
                         Result lists longer than 50 documents will be cutoff,\
                         otherwise will be padded. ")
-    parser.add_argument("--num_workers", type=int, default=4,
+    parser.add_argument("--num_workers", type=int, default=0,
                         help="Number of processes to load batches of data during training.")
     parser.add_argument("--data_dir", type=str,
                         default="/home/keping2/data/input/rand_small/all_sample/by_time",
@@ -74,6 +78,16 @@ def parse_args():
                         help="log file name")
     parser.add_argument("--use_popularity", type=str2bool, nargs='?', const=True, default=False,
                         help="Use documents' recent popularity as representation or not.")
+    parser.add_argument("--doc_occur", type=str2bool, nargs='?', const=True, default=False,
+                        help="Use the position doc occur in the past or not.")
+    parser.add_argument("--conv_occur", type=str2bool, nargs='?', const=True, default=False,
+                        help="Use the position the same thread occur in the past or not.")
+    parser.add_argument("--qinteract", type=str2bool, nargs='?', const=True, default=False,
+                        help="Use query interact with all features or not for the baseline.")
+    # parser.add_argument("--doc_occur", type=str, choices=["pos", "bool"],
+    #                     help="Whether docid occur in the history. (positional or boolean)")
+    # parser.add_argument("--conv_occur", type=str, choices=["pos", "bool"],
+    #                     help="Whether docid occur in the history. (positional or boolean)")
     parser.add_argument("--popularity_encoder_name", type=str,
                         default="lstm", choices=["lstm", "transformer"],
                         help="Specify the encoder name for the popularity sequence.")
@@ -96,7 +110,7 @@ def parse_args():
                         help="the number of users previous reviews used.")
     parser.add_argument("--doc_limit_per_q", type=int, default=2,
                         help="the number of item's previous reviews used.")
-    parser.add_argument("--max_train_epoch", type=int, default=5,
+    parser.add_argument("--max_train_epoch", type=int, default=10,
                         help="Limit on the epochs of training (0: no limit).")
     parser.add_argument("--start_epoch", type=int, default=0,
                         help="the epoch where we start training.")
@@ -169,16 +183,26 @@ def validate(args):
     cp_files = sorted(glob.glob(os.path.join(args.save_dir, 'model_epoch_*.ckpt')))
     global_data = PersonalSearchData(args, args.data_dir)
     valid_dataset = DocContextDataset(args, global_data, "valid")
-    best_mrr, best_model = 0, ""
+    if args.eval_train:
+        train_eval_dataset = DocContextDataset(args, global_data, "train", for_test=True)
+
+    best_ndcg, best_model = 0, ""
     for cur_model_file in cp_files:
         #logger.info("Loading {}".format(cur_model_file))
         cur_model, _ = create_model(args, global_data, cur_model_file)
         trainer = Trainer(args, cur_model, None)
-        mrr, prec = trainer.validate(args, global_data, valid_dataset)
-        logger.info("MRR:{} P@1:{} Model:{}".format(mrr, prec, cur_model_file))
-        if mrr > best_mrr:
-            best_mrr = mrr
+        mrr, prec, ndcg = trainer.validate(args, global_data, valid_dataset)
+        logger.info(
+            "Validation: NDCG:{} MRR:{} P@1:{} Model:{}".format(ndcg, mrr, prec, cur_model_file))
+        if ndcg > best_ndcg:
+            best_ndcg = ndcg
             best_model = cur_model_file
+        if args.eval_train:
+            train_mrr, train_prec, train_ndcg = trainer.validate(
+                args, global_data, train_eval_dataset, "Train")
+            logger.info(
+                "Train: NDCG:{} MRR:{} P@1:{} Model:{}".format(
+                    train_ndcg, train_mrr, train_prec, cur_model_file))
 
     best_model, _ = create_model(args, global_data, best_model)
     trainer = Trainer(args, best_model, None)
