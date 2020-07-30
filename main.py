@@ -165,12 +165,10 @@ def train(args):
     if args.device == "cuda":
         torch.cuda.manual_seed(args.seed)
 
-    personal_data = PersonalSearchData(args, args.data_dir)
-    #train_prod_data = PersonalSearchData(args, args.input_train_dir, "train", global_data)
+    personal_data = PersonalSearchData(args, args.input_dir)
 
     model, optim = create_model(args, personal_data, args.train_from)
     trainer = Trainer(args, model, optim)
-    #valid_prod_data = PersonalSearchData(args, args.input_train_dir, "valid", global_data)
     best_checkpoint_path = trainer.train(trainer.args, personal_data)
 
     best_model, _ = create_model(args, personal_data, best_checkpoint_path)
@@ -181,7 +179,7 @@ def train(args):
 
 def validate(args):
     cp_files = sorted(glob.glob(os.path.join(args.save_dir, 'model_epoch_*.ckpt')))
-    global_data = PersonalSearchData(args, args.data_dir)
+    global_data = PersonalSearchData(args, args.input_dir)
     valid_dataset = DocContextDataset(args, global_data, "valid")
     if args.eval_train:
         train_eval_dataset = DocContextDataset(args, global_data, "train", for_test=True)
@@ -209,11 +207,14 @@ def validate(args):
     trainer.test(args, global_data, "test", args.rankfname)
 
 def get_doc_scores(args):
-    global_data = PersonalSearchData(args, args.data_dir)
+    global_data = PersonalSearchData(args, args.input_dir)
     model_path = os.path.join(args.save_dir, 'model_best.ckpt')
     best_model, _ = create_model(args, global_data, model_path)
     trainer = Trainer(args, best_model, None)
+
     trainer.test(args, global_data, "test", args.rankfname)
+    trainer.test(args, global_data, "valid", args.rankfname.replace("test", "valid"))
+    trainer.test(args, global_data, "train", args.rankfname.replace("test", "train"))
 
 def main(args):
     if not os.path.isdir(args.save_dir):
