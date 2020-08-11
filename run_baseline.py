@@ -9,15 +9,27 @@ DATA_PATH = "%s" % INPUT_DIR # hist_len
 
 script_path = "python main.py"
 model_name = "baseline"
-AVAILABLE_CUDA_COUNT = 4
+AVAILABLE_CUDA_COUNT = 2
+START_NO = 0
 
-para_names = ["data_path", "lr", "warmup_steps", "max_train_epoch", "l2_lambda", "qinteract"]
-short_names = ["", "lr", "ws", "epoch", "l2", "qinter"]
+para_names = ["data_path", "lr", "warmup_steps", "max_train_epoch", "l2_lambda", "do_feat_norm"]
+short_names = ["", "lr", "ws", "epoch", "lnorm", "fnorm"]
 paras = [
-        ["by_time", 0.002, 2000, 10, 0.00005, True],
-        ["by_time", 0.002, 4000, 10, 0.00005, True],
+        ["by_time", 0.002, 4000, 10, 0.00001, True],
+        ["by_time", 0.002, 4000, 10, 0, True],
+        ["by_time", 0.002, 3000, 10, 0, True],
+        ["by_users", 0.002, 3000, 10, 0, True],
         ["by_users", 0.002, 3000, 10, 0.00001, True],
-        ["by_users", 0.002, 4000, 10, 0.00001, True],
+        ["by_users", 0.002, 3000, 10, 0.0001, True],
+        #["by_time", 0.002, 4000, 10, 0.00005, False],
+        #["by_time", 0.002, 4000, 10, 0.00005, True],
+        #["by_users", 0.002, 3000, 10, 0.00005, True, False],
+        #["by_users", 0.002, 3000, 10, 0.00005, False],
+        #["by_users", 0.002, 3000, 10, 0.00005, True],
+        # ["by_time", 0.002, 2000, 10, 0.00005, True],
+        # ["by_time", 0.002, 4000, 10, 0.00005, True],
+        # ["by_users", 0.002, 3000, 10, 0.00001, True],
+        # ["by_users", 0.002, 4000, 10, 0.00001, True],
         # ["by_time", 0.0005, 10, 0],
         # ["by_time", 0.001, 10, 0],
         # ["by_time", 0.002, 10, 0],
@@ -32,14 +44,13 @@ paras = [
         ]
 
 if __name__ == '__main__':
-    start_no = 0
     f_dic = dict()
-    for cuda_no in range(start_no, start_no + AVAILABLE_CUDA_COUNT):
+    for cuda_no in range(START_NO, START_NO + AVAILABLE_CUDA_COUNT):
         cuda_no = cuda_no % AVAILABLE_CUDA_COUNT
         fname = "%s.cuda%d.sh" % (model_name, cuda_no)
         f = open(fname, 'w')
         f_dic[cuda_no] = f
-    cuda_no = start_no
+    cuda_no = START_NO
     for para in paras:
         cmd_arr = []
         cmd_arr.append("CUDA_VISIBLE_DEVICES=%d" % cuda_no)
@@ -56,8 +67,8 @@ if __name__ == '__main__':
         log_file = "%s/%s.log" % (log_dir, run_name)
         cur_cmd_option = " ".join(["--{} {}".format(x,y) for x,y in zip(para_names[1:], para[1:])])
         cmd_arr.append(cur_cmd_option)
-        cmd = "%s > %s &" % (" ".join(cmd_arr), log_file)
-        #cmd = "%s" % (" ".join(cmd_arr))
+        #cmd = "%s > %s &" % (" ".join(cmd_arr), log_file)
+        cmd = "%s" % (" ".join(cmd_arr))
         #os.system(cmd)
         fout = f_dic[cuda_no]
         fout.write("%s\n" % (cmd))

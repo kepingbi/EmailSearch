@@ -15,11 +15,21 @@ class BaseEmailRanker(nn.Module):
     g_qdiscrete_features = ["num_q_words", "num_q_operators", "item_type",
                             "locale_lcid", "culture_id", "query_lang_hash", "user_type"]
     g_doc_discrete_features = ["response_requested", "importance", "is_read",
-                               "flag_status", "email_class", # "conversation_hash",
+                               "flag_status", "tolist_size", "cclist_size",
+                               "bcclist_size", "to_position", "cc_position",
+                               "email_class", # "conversation_hash",
                                "subject_prefix_hash"]
+
     g_qdiscrete_feat_idx = {y:x for x, y in enumerate(g_qdiscrete_features)}
     g_doc_discrete_feat_idx = {y:x for x, y in enumerate(g_doc_discrete_features)}
-    g_operators_count = 10 # set to 10, otherwise cut
+    # the following should be the same with PersonalSearchData
+    # g_operators_count = 10 # set to 10, otherwise cut
+    # g_tolist_size = 10 # set to 10, otherwise cut
+    # g_cclist_size = 10 # set to 10, otherwise cut
+    # g_bcclist_size = 10 # set to 10, otherwise cut
+    # g_to_position_count = 10 # set to 10, otherwise cut
+    # g_cc_position_count = 10 # set to 10, otherwise cut
+
     def __init__(self, args, personal_data, device):
         super(BaseEmailRanker, self).__init__()
         self.args = args
@@ -29,19 +39,19 @@ class BaseEmailRanker(nn.Module):
         self.discrete_qfeat_emb_size = [10, 10, 10, 10, 10, 10, 30]
         # num_q_words, num_q_operators, item_type, locale_lcid, culture_id,
         # query_lang_hash, user_type (consumer or commercial)
-        self.discrete_dfeat_emb_size = [10, 10, 10, 10, 10, 10]
+        self.discrete_dfeat_emb_size = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
         self.embedding_size = self.args.embedding_size
         # response_requested, importance, is_read, flag_status, email_class
         # conversation_hash, subject_prefix_hash
         # embeddings for query discrete features
         self.num_qwords_emb = nn.Embedding(
-            self.args.max_qwords_count + 1,
+            self.personal_data.g_qwords_count + 1,
             self.discrete_qfeat_emb_size[self.g_qdiscrete_feat_idx['num_q_words']],
             padding_idx=0)
         # print(self.personal_data.g_max_q_operator_count)
-        self.num_qoperatore_emb = nn.Embedding(
+        self.num_qoperator_emb = nn.Embedding(
             # self.personal_data.g_max_q_operator_count + 1,
-            self.g_operators_count + 1,
+            self.personal_data.g_operators_count + 1,
             self.discrete_qfeat_emb_size[self.g_qdiscrete_feat_idx['num_q_operators']],
             padding_idx=0)
         self.item_type_emb = nn.Embedding(
@@ -64,7 +74,7 @@ class BaseEmailRanker(nn.Module):
             len(self.personal_data.user_types),
             self.discrete_qfeat_emb_size[self.g_qdiscrete_feat_idx['user_type']],
             padding_idx=0)
-        self.q_discrete_emb_list = [self.num_qwords_emb, self.num_qoperatore_emb, \
+        self.q_discrete_emb_list = [self.num_qwords_emb, self.num_qoperator_emb, \
             self.item_type_emb, self.locale_lcid_emb, self.culture_id_emb, \
                 self.query_lang_emb, self.user_type_emb]
         # embeddings for document discrete features
@@ -84,6 +94,26 @@ class BaseEmailRanker(nn.Module):
             4, # 0, for padding, 0+1,1+1,2+1
             self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['flag_status']],
             padding_idx=0)
+        self.tolist_size_emb = nn.Embedding(
+            self.personal_data.g_tolist_size + 1, # 0, for padding,
+            self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['tolist_size']],
+            padding_idx=0)
+        self.cclist_size_emb = nn.Embedding(
+            self.personal_data.g_cclist_size + 1, # 0, for padding,
+            self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['cclist_size']],
+            padding_idx=0)
+        self.bcclist_size_emb = nn.Embedding(
+            self.personal_data.g_bcclist_size + 1, # 0, for padding,
+            self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['bcclist_size']],
+            padding_idx=0)
+        self.to_position_emb = nn.Embedding(
+            self.personal_data.g_to_position_count + 1, # 0, for padding,
+            self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['to_position']],
+            padding_idx=0)
+        self.cc_position_emb = nn.Embedding(
+            self.personal_data.g_cc_position_count + 1, # 0, for padding,
+            self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['cc_position']],
+            padding_idx=0)
         self.email_class_emb = nn.Embedding(
             len(self.personal_data.email_class_hashes),
             self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['email_class']],
@@ -97,10 +127,10 @@ class BaseEmailRanker(nn.Module):
             self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['subject_prefix_hash']],
             padding_idx=0)
         self.d_discrete_emb_list = [self.response_request_emb, self.importance_emb, \
-            self.is_read_emb, self.flag_emb, self.email_class_emb, \
-                self.subject_prefix_hash_emb]
-            # self.conversation_hash_emb, self.subject_prefix_hash_emb]
-
+            self.is_read_emb, self.flag_emb, self.tolist_size_emb, self.cclist_size_emb, \
+                self.bcclist_size_emb, self.to_position_emb, self.cc_position_emb, \
+                    self.email_class_emb, self.subject_prefix_hash_emb]
+            # self.conversation_hash_emb,
         self.qcont_W1 = nn.Linear(
             self.personal_data.qcont_feat_count, self.args.embedding_size//2)
         self.dcont_W1 = nn.Linear(
@@ -246,7 +276,7 @@ class BaseEmailRanker(nn.Module):
             logger.info("BaseEmailRanker initialization started.")
         # embeddings for query discrete features
         nn.init.normal_(self.num_qwords_emb.weight)
-        nn.init.normal_(self.num_qoperatore_emb.weight)
+        nn.init.normal_(self.num_qoperator_emb.weight)
         nn.init.normal_(self.item_type_emb.weight)
         nn.init.normal_(self.locale_lcid_emb.weight)
         nn.init.normal_(self.culture_id_emb.weight)
@@ -258,6 +288,11 @@ class BaseEmailRanker(nn.Module):
         nn.init.normal_(self.importance_emb.weight)
         nn.init.normal_(self.is_read_emb.weight)
         nn.init.normal_(self.flag_emb.weight)
+        nn.init.normal_(self.tolist_size_emb.weight)
+        nn.init.normal_(self.cclist_size_emb.weight)
+        nn.init.normal_(self.bcclist_size_emb.weight)
+        nn.init.normal_(self.to_position_emb.weight)
+        nn.init.normal_(self.cc_position_emb.weight)
         nn.init.normal_(self.email_class_emb.weight)
         # nn.init.normal_(self.conversation_hash_emb.weight)
         nn.init.normal_(self.subject_prefix_hash_emb.weight)

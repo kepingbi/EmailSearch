@@ -47,7 +47,7 @@ DOC_FEATURES = [
     "AdvancedPreferFeature_11",
     # "Expression=(max 0 (- AdvancedPreferFeature_123 AdvancedPreferFeature_11))",
     "AdvancedPreferFeature_5",
-    "AdvancedPreferFeature_7", #int32 ExchangeEmailImportance, 0,1,2, 
+    "AdvancedPreferFeature_7", #int32 ExchangeEmailImportance, 0,1,2,
     "AdvancedPreferFeature_8",
     "AdvancedPreferFeature_9",
     "AdvancedPreferFeature_12",
@@ -78,10 +78,10 @@ DOC_FEATURES = [
     "NumberOfStreamInstances_Exchangeemaildisplaybcclist"
     ]
 QUERY_DOC_MATCH_FEATURES = [
-    "TermFrequency_Body_0L", # "Expression=(+ TermFrequency_Body_0L TermFrequency_Body_1L)",
-    "TermFrequency_Body_1L",
-    "TermFrequency_Body_0U",
-    "TermFrequency_Body_1U", # "Expression=(+ TermFrequency_Body_0U TermFrequency_Body_1U)",
+    # "TermFrequency_Body_0L", # "Expression=(+ TermFrequency_Body_0L TermFrequency_Body_1L)",
+    # "TermFrequency_Body_1L",
+    # "TermFrequency_Body_0U",
+    # "TermFrequency_Body_1U", # "Expression=(+ TermFrequency_Body_0U TermFrequency_Body_1U)",
     "TermFrequency_From_0L",
     "TermFrequency_Subject_0L",
     "OriginalQueryPerStreamBM25FNorm_Exchangeemailsubjectprefix",
@@ -351,6 +351,24 @@ QUERY_DOC_MATCH_FEATURES = [
     "DerivedLastOccurrenceRarestWord_Exchangeemaildisplaycclistprefix",
     "NumberOfTrueNearTriples_Exchangeemailsubject"
     ]
+CONT_FEATURES = [
+        'DocumentFrequency_0U', # -> df
+        'DocumentFrequency_1U',
+        'DocumentFrequency_2U',
+        'DocumentFrequency_3U',
+        'DocumentFrequency_4U',
+        'DocumentFrequency_5U',
+        'AdvancedPreferFeature_11', # created time-> recency
+        'AdvancedPreferFeature_12',
+        'AdvancedPreferFeature_17',
+        ] + DOC_FEATURES[16:] + QUERY_DOC_MATCH_FEATURES
+META_COLUMNS = [
+    "m:QueryId",
+    "m:MailboxId",
+    "m:DocId",
+    "m:Rating"
+]
+APPEND_FEATURES = ["TermFrequency_Body_01L", "TermFrequency_Body_01U"]
 
 def cut_q_u_searchtime(finput, foutput):
     '''cut the column of queryid, userid and searchtime and output to another file
@@ -659,16 +677,121 @@ def output_new_feat_file(featfile_list, qset, output_feat_file):
                     # save the line no so that no split is needed when filtering
     # except Exception as e:
     #     print("Error Message: {}".format(e))
+def store_min_max_feat(feat_min_max_dic, feat_col, feat_val):
+    if feat_col not in feat_min_max_dic:
+        feat_min_max_dic[feat_col] = [feat_val, feat_val]
+    feat_min_max_dic[feat_col][0] = min(feat_min_max_dic[feat_col][0], feat_val)
+    feat_min_max_dic[feat_col][1] = max(feat_min_max_dic[feat_col][1], feat_val)
+
+def collect_cont_feat_min_max(feat_name_dic, feat_min_max_dic, segs):
+    ''' revise compute some of the features and get min, max value of the continous features
+    '''
+    for feat_name in CONT_FEATURES + APPEND_FEATURES: # 6+3
+        feat_val = float(segs[feat_name_dic[feat_name]]) # they may be ""
+        store_min_max_feat(feat_min_max_dic, feat_name, feat_val)
+
+
+def convert_special_features(feat_name_dic, segs):
+    ''' revise compute some of the features and get min, max value of the continous features
+    '''
+    mailbox_doc_count = float(segs[feat_name_dic['NumMailboxDocuments']])
+    for i in range(6):
+        doc_freq_u = float(segs[feat_name_dic['DocumentFrequency_{}U'.format(i)]])
+        doc_freq_l = float(segs[feat_name_dic['DocumentFrequency_{}L'.format(i)]])
+        df = 0. if mailbox_doc_count == 0 \
+            else max(doc_freq_u, doc_freq_l)/mailbox_doc_count
+        df_col_name = 'DocumentFrequency_{}U'.format(i)
+        segs[feat_name_dic[df_col_name]] = df
+
+    search_time = int(segs[feat_name_dic['AdvancedPreferFeature_123']])
+    created_time = int(segs[feat_name_dic['AdvancedPreferFeature_11']])
+    recency = search_time - created_time
+    segs[feat_name_dic['AdvancedPreferFeature_11']] = recency
+    flag_complete_time = int(segs[feat_name_dic['AdvancedPreferFeature_12']])
+    fct_col = 'AdvancedPreferFeature_12'
+    complete_interval = search_time - flag_complete_time
+    segs[feat_name_dic[fct_col]] = complete_interval
+
+    email_size = int(segs[feat_name_dic['AdvancedPreferFeature_17']])
+    for feat_name in CONT_FEATURES[9:]: # 6+3
+        feature = segs[feat_name_dic[feat_name]]
+        feat_val = 0. if not feature else float(feature) # they may be ""
+        segs[feat_name_dic[feat_name]] = feat_val
+
+    term0_freq_l = float(segs[feat_name_dic["TermFrequency_Body_0L"]])
+    term0_freq_u = float(segs[feat_name_dic["TermFrequency_Body_0U"]])
+    term1_freq_l = float(segs[feat_name_dic["TermFrequency_Body_1L"]])
+    term1_freq_u = float(segs[feat_name_dic["TermFrequency_Body_1U"]])
+    segs.append(term0_freq_l + term1_freq_l)
+    segs.append(term0_freq_u + term1_freq_u)
+
+
+def norm_feature(feat_min_max_dic, feat_col, feat_val, scale=10.):
+    feat_span = feat_min_max_dic[feat_col][1] \
+        - feat_min_max_dic[feat_col][0]
+    feat_val = 0.0 if feat_span == 0 \
+        else (feat_val - feat_min_max_dic[feat_col][0]) / feat_span
+    return feat_val * scale
+
+def get_feat_min_max_from_file(feat_file, feat_min_max_dic):
+    # do feature normalization in advance
+    line_no = 0
+    with gzip.open(feat_file, "rt") as fin:
+        line = fin.readline().strip('\r\n')
+        feat_col_name = line.split('\t')
+        feat_col_name += APPEND_FEATURES
+        feat_name_dic = {feat_col_name[i]: i for i in range(len(feat_col_name))}
+        for line in fin:
+            line_no += 1
+            if line_no % 100000 == 0:
+                print("%d lines has been parsed!" % (line_no))
+            line = line.strip('\r\n')
+            segs = line.split('\t')
+            convert_special_features(feat_name_dic, segs)
+            collect_cont_feat_min_max(feat_name_dic, feat_min_max_dic, segs)
+
+def normalize_feature_file(feat_file, norm_feat_file, scale=10.):
+    feat_min_max_dic = dict()
+    get_feat_min_max_from_file(feat_file, feat_min_max_dic)
+    print(feat_min_max_dic)
+    # feat_min_max_dic['BM25f_simple'][0] = 0.
+    # feat_min_max_dic['BM25f_simple'][1] = 0.
+    meta_col_set = set(META_COLUMNS)
+    line_no = 0
+    with gzip.open(feat_file, "rt") as fin, gzip.open(norm_feat_file, "wt") as fout:
+        line = fin.readline().strip('\r\n')
+        feat_col_name = line.split('\t')
+        ori_feat_name_dic = {feat_col_name[i]: i for i in range(len(feat_col_name))}
+        feat_col_name = [x for x in feat_col_name if not x.startswith("m:") or x in meta_col_set]
+        feat_col_name += APPEND_FEATURES
+        feat_name_dic = {feat_col_name[i]: i for i in range(len(feat_col_name))}
+        fout.write("{}\n".format("\t".join(feat_col_name)))
+        for line in fin:
+            line_no += 1
+            if line_no % 100000 == 0:
+                print("%d lines has been parsed!" % (line_no))
+            line = line.strip('\r\n')
+            segs = line.split('\t')
+            segs = [segs[ori_feat_name_dic[x]] for x in feat_col_name[:-2]]
+            convert_special_features(feat_name_dic, segs)
+            for feat_name in CONT_FEATURES + APPEND_FEATURES: # 6+3
+                feat_val = float(segs[feat_name_dic[feat_name]]) # they may be ""
+                feat_val = norm_feature(feat_min_max_dic, feat_name, feat_val, scale)
+                feat_val = str(int(feat_val)) \
+                    if feat_val.is_integer() else "{:.4f}".format(feat_val)
+                segs[feat_name_dic[feat_name]] = feat_val
+
+            fout.write("{}\n".format("\t".join(segs)))
 
 def main():
     print(sys.argv)
     parser = argparse.ArgumentParser()
     #parser.add_argument('--feat_file1', default="/home/keping2/data/input/rand.small.gz")
-    parser.add_argument('--feat_file1', '-f1', default="/home/keping2/data/input/1_6_1_13_data.gz")
+    parser.add_argument('--feat_file', '-f', default="/home/keping2/data/input/1_6_1_13_data.gz")
     #parser.add_argument('--feat_file2', '-f2', default="/home/keping2/data/input/1_27_2_2_data.gz")
     #parser.add_argument('--output_file1', default="/home/keping2/data/input/rand_small_qutime.gz")
     parser.add_argument(
-        '--output_file1', '-o1', default="/home/keping2/data/input/1st_week_qutime.gz")
+        '--output_file', '-o', default="/home/keping2/data/input/1st_week_qutime.gz")
     # parser.add_argument(
     # '--output_file2', '-o2', default="/home/keping2/data/input/2nd_week_qutime.gz")
     parser.add_argument(
@@ -676,7 +799,7 @@ def main():
     parser.add_argument(
         '--option', default="none",
         choices=["cut_qu", "partition", "rnd_sample", "filter_users", \
-                "extract_feat", "none"])
+                "extract_feat", "norm_feat", "none"])
     parser.add_argument(
         '--data_path', '-d', default="", help="Data directory for cut_qutime file")
     parser.add_argument(
@@ -689,11 +812,14 @@ def main():
     parser.add_argument(
         '--hist_len_ubound', default=21, type=int,
         help="Only keep users with query count <= hist_len")
+    parser.add_argument(
+        '--scale', default=100., type=float,
+        help="scale the normed features up by this number")
     # query count 11, hist_len is 10
 
     paras = parser.parse_args()
     if paras.option == "cut_qu":
-        cut_q_u_searchtime(paras.feat_file1, paras.output_file1)
+        cut_q_u_searchtime(paras.feat_file, paras.output_file)
     elif paras.option == "rnd_sample":
         fname_list = glob.glob("%s/*_qutime.gz" % (paras.data_path))
         arr_list = []
@@ -720,6 +846,10 @@ def main():
             paras.data_path, paras.rnd_ratio, paras.hist_len)
         print("AfterFiltering:#Query:%d #User:%d" % (len(qset), len(uset)))
         output_new_feat_file([input_feat_file], qset, output_feat_file)
+    elif paras.option == "norm_feat":
+        outfname = os.path.splitext(os.path.splitext(paras.feat_file)[0])[0] + "_norm.txt.gz"
+        norm_feat_file = os.path.join(os.path.dirname(paras.feat_file), outfname)
+        normalize_feature_file(paras.feat_file, norm_feat_file, paras.scale)
     elif paras.option == "partition":
         if paras.hist_len == 0:
             # fname_list = glob.glob("%s/*_qutime.gz" % (paras.data_path))

@@ -84,7 +84,7 @@ def parse_args():
                         help="Use the position doc occur in the past or not.")
     parser.add_argument("--conv_occur", type=str2bool, nargs='?', const=True, default=False,
                         help="Use the position the same thread occur in the past or not.")
-    parser.add_argument("--qinteract", type=str2bool, nargs='?', const=True, default=False,
+    parser.add_argument("--qinteract", type=str2bool, nargs='?', const=True, default=True,
                         help="Use query interact with all features or not for the baseline.")
     # parser.add_argument("--doc_occur", type=str, choices=["pos", "bool"],
     #                     help="Whether docid occur in the history. (positional or boolean)")

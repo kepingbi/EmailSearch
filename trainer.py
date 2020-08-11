@@ -146,7 +146,7 @@ class Trainer(object):
         #by default axis=-1, along the last axis
         mrr, prec = self.calc_metrics(sorted_doc_idxs, all_doc_ratings)
         ndcg = self.calc_metrics_ndcg(sorted_doc_idxs, all_doc_ratings)
-        logger.info("Test: NDCG:{} MRR:{} P@1:{}".format(ndcg, mrr, prec))
+        logger.info("Test {}: NDCG:{} MRR:{} P@1:{}".format(partition, ndcg, mrr, prec))
         output_path = os.path.join(args.save_dir, rankfname) + '.gz'
         eval_count = all_doc_scores.shape[0]
         with gzip.open(output_path, 'wt') as rank_fout:

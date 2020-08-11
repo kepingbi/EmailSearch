@@ -18,7 +18,6 @@ class PersonalSearchData():
     # features used in the FastRank model which will be used to
     # filter out other columns in the feature file.
     # g_FEATURE_LIST = []
-
     QUERY_FEATURES = [
         "Expression=(if (== NumMailboxDocuments 0) 0 (/(max DocumentFrequency_0L DocumentFrequency_0U) NumMailboxDocuments))",
         "Expression=(if (== NumMailboxDocuments 0) 0 (/(max DocumentFrequency_1L DocumentFrequency_1U) NumMailboxDocuments))",
@@ -339,17 +338,38 @@ class PersonalSearchData():
         "DerivedLastOccurrenceRarestWord_Exchangeemaildisplaycclistprefix",
         "NumberOfTrueNearTriples_Exchangeemailsubject"
         ]
+    CONT_FEATURES = [
+        'DocumentFrequency_0U', # -> df
+        'DocumentFrequency_1U',
+        'DocumentFrequency_2U',
+        'DocumentFrequency_3U',
+        'DocumentFrequency_4U',
+        'DocumentFrequency_5U',
+        'AdvancedPreferFeature_11', # created time-> recency
+        'AdvancedPreferFeature_12',
+        'AdvancedPreferFeature_17',
+        ] + DOC_FEATURES[15:] + QUERY_DOC_MATCH_FEATURES[2:]
     RATING_MAP = {"Bad":0, "Fair":1, "Good":2, "Excellent":3, "Perfect":4}
     def __init__(self, args, data_path):
         self.args = args
+        self.g_qwords_count = self.args.max_qwords_count
+        self.g_operators_count = 10 # set to 10, otherwise cut
+        self.g_tolist_size = 10 # set to 10, otherwise cut
+        self.g_cclist_size = 10 # set to 10, otherwise cut
+        self.g_bcclist_size = 10 # set to 10, otherwise cut
+        self.g_to_position_count = 10 # set to 10, otherwise cut
+        self.g_cc_position_count = 10 # set to 10, otherwise cut
+        self.feat_scale = 10
         self.candi_doc_count = self.args.candi_doc_count
         # feat_fname = "%s/extract_hl%d_feat_file.txt.gz" % (data_path, self.args.hist_len)
         if args.hist_len == 0:
-            feat_fname = "%s/extract_sample%.2f_feat_file.txt.gz" % (
-                args.input_dir, args.rnd_ratio)
+            feat_fname = "%s/extract_sample%.2f_feat_file" % (
+                data_path, args.rnd_ratio)
         else:
-            feat_fname = "%s/extract_sample%.2f_hist_len%d_feat_file.txt.gz" % ( \
-                args.input_dir, args.rnd_ratio, args.hist_len)
+            feat_fname = "%s/extract_sample%.2f_hist_len%d_feat_file" % ( \
+                data_path, args.rnd_ratio, args.hist_len)
+        feat_fname = feat_fname + "_norm" if self.args.do_feat_norm else feat_fname
+        feat_fname += ".txt.gz"
         logger.info("Read %s" % feat_fname)
         self.feature_col_name, self.feature_name_dic, self.query_info_dic = \
             self.read_feature_file(feat_fname)
@@ -360,7 +380,7 @@ class PersonalSearchData():
         self.doc_pad_idx = -1
         # may need to convert to read multiple feature files TODO
         self.qcont_feat_count = 6
-        self.dcont_feat_count = 8 + len(self.DOC_FEATURES[15:]) # 24
+        self.dcont_feat_count = 3 + len(self.DOC_FEATURES[15:]) # 24
         self.qdcont_feat_count = len(self.QUERY_DOC_MATCH_FEATURES)
 
     def read_feature_file(self, fname):
@@ -370,7 +390,8 @@ class PersonalSearchData():
         self.query_lang_hash_idx_dic, self.query_lang_hashes = dict(), [-1]
         self.culture_id_idx_dic, self.culture_ids = dict(), [-1]
         self.locale_lcid_idxs_dic, self.locale_lcids = dict(), [-1]
-        self.g_max_q_operator_count = 0
+        cont_feat_set = set(self.CONT_FEATURES)
+        g_max_q_operator_count = 0
         ### dicrete document features (that need to be mapped)###
         self.subject_prefix_hash_idx_dic, self.subject_prefix_hashes = dict(), [-1]
         self.email_class_hash_idx_dic, self.email_class_hashes = dict(), [-1]
@@ -388,10 +409,15 @@ class PersonalSearchData():
                     if line_no % 100000 == 0:
                         print("%d lines has been parsed!" % line_no)
                     segs = line.strip().split('\t')
+                    # segs = [segs[feat_name_dic[x]] if x.startswith("m:") \
+                    #     else float(segs[feat_name_dic[x]]) for x in feat_col_name]
+                    # segs = [float(segs[feat_name_dic[x]]) if x in cont_feat_set \
+                    #     else segs[feat_name_dic[x]] for x in feat_col_name]
+
                     qid = int(segs[feat_name_dic['m:QueryId']])
                     q_info_dic[qid].append(segs)
                     num_of_operators = int(segs[feat_name_dic['QueryLevelFeature_1995']])
-                    self.g_max_q_operator_count = max(self.g_max_q_operator_count, num_of_operators)
+                    g_max_q_operator_count = max(g_max_q_operator_count, num_of_operators)
                     item_type = int(segs[feat_name_dic['QueryLevelFeature_1997']])
                     if item_type not in self.item_type_idx_dic:
                         self.item_type_idx_dic[item_type] = len(self.item_types)
@@ -431,7 +457,7 @@ class PersonalSearchData():
 
             except Exception as e:
                 print("Error Message: {}".format(e))
-        print("max_q_operator_count", self.g_max_q_operator_count)
+        print("max_q_operator_count", g_max_q_operator_count)
         return feat_col_name, feat_name_dic, q_info_dic
 
     def sort_query_per_user(self, feat_name_dic, q_info_dic):
@@ -465,107 +491,138 @@ class PersonalSearchData():
     # query-document matching features (all should be continous)
     # continous features can be discretized to different bins (optional).
 
-    def collect_group_features(self, seg_features, feat_name_dic):
+    def collect_group_features(self, segs, feat_name_dic):
         #group features that are discrete and separate them from the remaining continous values.
         #query-level features
         query_cont_features, query_discrete_features = self.collect_query_features(
-            seg_features, feat_name_dic)
+            segs, feat_name_dic)
         assert self.qcont_feat_count == len(query_cont_features)
         doc_cont_features, doc_discrete_features = self.collect_doc_features(
-            seg_features, feat_name_dic)
+            segs, feat_name_dic)
         assert self.dcont_feat_count == len(doc_cont_features)
-        qd_cont_features = self.collect_qd_matching_features(seg_features, feat_name_dic)
+        qd_cont_features = self.collect_qd_matching_features(segs, feat_name_dic)
         assert self.qdcont_feat_count == len(qd_cont_features)
         return query_cont_features, query_discrete_features, doc_cont_features, \
             doc_discrete_features, qd_cont_features
 
-    def collect_query_features(self, seg_features, feat_name_dic):
+    def collect_query_features(self, segs, feat_name_dic):
         query_cont_features = []
-        mailbox_doc_count = float(seg_features[feat_name_dic['NumMailboxDocuments']])
-        for i in range(6):
-            doc_freq_u = float(seg_features[feat_name_dic['DocumentFrequency_{}U'.format(i)]])
-            doc_freq_l = float(seg_features[feat_name_dic['DocumentFrequency_{}L'.format(i)]])
-            df = 0. if mailbox_doc_count == 0 else max(doc_freq_u, doc_freq_l)/mailbox_doc_count
-            query_cont_features.append(df)
+        if self.args.do_feat_norm:
+            for i in range(6):
+                # already processed to be df
+                df_col_name = 'DocumentFrequency_{}U'.format(i)
+                df = float(segs[feat_name_dic[df_col_name]])
+                query_cont_features.append(df)
+        else:
+            mailbox_doc_count = float(segs[feat_name_dic['NumMailboxDocuments']])
+            for i in range(6):
+                doc_freq_u = float(segs[feat_name_dic['DocumentFrequency_{}U'.format(i)]])
+                doc_freq_l = float(segs[feat_name_dic['DocumentFrequency_{}L'.format(i)]])
+                df = 0. if mailbox_doc_count == 0 else max(doc_freq_u, doc_freq_l)/mailbox_doc_count
+                query_cont_features.append(df)
 
         query_discrete_features = []
-        feature = int(seg_features[feat_name_dic['NumberOfWordsInQuery']]) + 1
-        feature = feature if feature < 11 else 10
+        feature = int(segs[feat_name_dic['NumberOfWordsInQuery']]) + 1
+        feature = feature if feature < self.g_qwords_count+1 else self.g_qwords_count
         # 0 reserved for padding
         query_discrete_features.append(feature)
-        feature = int(seg_features[feat_name_dic['QueryLevelFeature_1995']]) + 1
-        feature = feature if feature < 10 else 10
+        feature = int(segs[feat_name_dic['QueryLevelFeature_1995']]) + 1
+        feature = feature if feature < self.g_operators_count+1 else self.g_operators_count
         # number of operators in a query
         query_discrete_features.append(feature)
-        feature = int(seg_features[feat_name_dic['QueryLevelFeature_1997']])
+        feature = int(segs[feat_name_dic['QueryLevelFeature_1997']])
         query_discrete_features.append(self.item_type_idx_dic[feature])
-        feature = int(seg_features[feat_name_dic['QueryLevelFeature_1998']])
+        feature = int(segs[feat_name_dic['QueryLevelFeature_1998']])
         query_discrete_features.append(self.locale_lcid_idxs_dic[feature])
-        feature = int(seg_features[feat_name_dic['QueryLevelFeature_1999']])
+        feature = int(segs[feat_name_dic['QueryLevelFeature_1999']])
         query_discrete_features.append(self.culture_id_idx_dic[feature])
-        feature = int(seg_features[feat_name_dic['QueryLevelFeature_2001']])
+        feature = int(segs[feat_name_dic['QueryLevelFeature_2001']])
         query_discrete_features.append(self.query_lang_hash_idx_dic[feature])
-        feature = int(seg_features[feat_name_dic['QueryLevelFeature_2002']])
+        feature = int(segs[feat_name_dic['QueryLevelFeature_2002']])
         query_discrete_features.append(self.user_type_idx_dic[feature])
         return query_cont_features, query_discrete_features
 
-    def collect_doc_features(self, seg_features, feat_name_dic):
+    def collect_doc_features(self, segs, feat_name_dic):
         doc_cont_features = []
-        search_time = int(seg_features[feat_name_dic['AdvancedPreferFeature_123']])
-        created_time = int(seg_features[feat_name_dic['AdvancedPreferFeature_11']])
-        recency = search_time - created_time + 1 # to make it different from padding value 0
-        doc_cont_features.append(recency)
-        flag_complete_time = int(seg_features[feat_name_dic['AdvancedPreferFeature_12']])
-        doc_cont_features.append(search_time - flag_complete_time + 1) #normalized by Keping
-        email_size = int(seg_features[feat_name_dic['AdvancedPreferFeature_17']]) + 1
+        if self.args.do_feat_norm:
+            recency = float(segs[feat_name_dic['AdvancedPreferFeature_11']])
+            recency = recency - self.feat_scale
+        else:
+            search_time = float(segs[feat_name_dic['AdvancedPreferFeature_123']])
+            created_time = float(segs[feat_name_dic['AdvancedPreferFeature_11']])
+            recency = search_time - created_time + 1 # to make it different from padding value 0
+        doc_cont_features.append(-recency) # so that the padding value 0 means long
+        if self.args.do_feat_norm:
+            fct = float(segs[feat_name_dic['AdvancedPreferFeature_12']])
+            fct = fct - self.feat_scale
+        else:
+            flag_complete_time = float(segs[feat_name_dic['AdvancedPreferFeature_12']])
+            fct = search_time - flag_complete_time + 1
+        doc_cont_features.append(-fct) #normalized by Keping
+        email_size = float(segs[feat_name_dic['AdvancedPreferFeature_17']])
         doc_cont_features.append(email_size)
-        tolist_size = int(seg_features[feat_name_dic['AdvancedPreferFeature_98']])
-        tolist_size = 0 if tolist_size == 4294967295 else tolist_size + 1 # -1 as uint
-        doc_cont_features.append(tolist_size)
-        cclist_size = int(seg_features[feat_name_dic['AdvancedPreferFeature_99']])
-        cclist_size = 0 if cclist_size == 4294967295 else cclist_size + 1
-        doc_cont_features.append(cclist_size)
-        bcclist_size = int(seg_features[feat_name_dic['AdvancedPreferFeature_100']])
-        bcclist_size = 0 if bcclist_size == 4294967295 else bcclist_size + 1
-        doc_cont_features.append(bcclist_size)
-        to_position = int(seg_features[feat_name_dic['AdvancedPreferFeature_154']])
-        to_position = 0 if to_position == 4294967295 else to_position + 1
-        doc_cont_features.append(to_position)
-        cc_position = int(seg_features[feat_name_dic['AdvancedPreferFeature_155']])
-        cc_position = 0 if cc_position == 4294967295 else cc_position + 1
-        doc_cont_features.append(cc_position)
         for feat in self.DOC_FEATURES[15:]:
-            feature = int(seg_features[feat_name_dic[feat]])
+            feature = float(segs[feat_name_dic[feat]])
             doc_cont_features.append(feature)
-        doc_cont_features = [float(x) for x in doc_cont_features]
         doc_discrete_features = []
-        is_response_requested = int(seg_features[feat_name_dic['AdvancedPreferFeature_5']])
+        is_response_requested = int(segs[feat_name_dic['AdvancedPreferFeature_5']])
         doc_discrete_features.append(is_response_requested + 1) # 0 reserved for padding
-        importance = int(seg_features[feat_name_dic['AdvancedPreferFeature_7']])
+        importance = int(segs[feat_name_dic['AdvancedPreferFeature_7']])
         doc_discrete_features.append(importance + 1)
-        is_read = int(seg_features[feat_name_dic['AdvancedPreferFeature_8']])
+        is_read = int(segs[feat_name_dic['AdvancedPreferFeature_8']])
         doc_discrete_features.append(is_read + 1)
-        flag_status = int(seg_features[feat_name_dic['AdvancedPreferFeature_9']])
+        flag_status = int(segs[feat_name_dic['AdvancedPreferFeature_9']])
         doc_discrete_features.append(flag_status + 1)
-        item_class_hash = int(seg_features[feat_name_dic['AdvancedPreferFeature_149']])
+
+        tolist_size = int(segs[feat_name_dic['AdvancedPreferFeature_98']])
+        tolist_size = 0 if tolist_size == 4294967295 else tolist_size + 1 # -1 as uint
+        tolist_size = tolist_size if tolist_size < self.g_tolist_size+1 else self.g_tolist_size
+        doc_discrete_features.append(tolist_size)
+        cclist_size = int(segs[feat_name_dic['AdvancedPreferFeature_99']])
+        cclist_size = 0 if cclist_size == 4294967295 else cclist_size + 1
+        cclist_size = cclist_size if cclist_size < self.g_cclist_size+1 else self.g_cclist_size
+        doc_discrete_features.append(cclist_size)
+        bcclist_size = int(segs[feat_name_dic['AdvancedPreferFeature_100']])
+        bcclist_size = 0 if bcclist_size == 4294967295 else bcclist_size + 1
+        bcclist_size = bcclist_size if bcclist_size < self.g_bcclist_size+1 else self.g_bcclist_size
+        doc_discrete_features.append(bcclist_size)
+        to_position = int(segs[feat_name_dic['AdvancedPreferFeature_154']])
+        to_position = 0 if to_position == 4294967295 else to_position + 1
+        to_position = to_position if to_position < self.g_to_position_count+1 \
+            else self.g_to_position_count
+        doc_discrete_features.append(to_position)
+        cc_position = int(segs[feat_name_dic['AdvancedPreferFeature_155']])
+        cc_position = 0 if cc_position == 4294967295 else cc_position + 1
+        cc_position = cc_position if cc_position < self.g_cc_position_count+1 \
+            else self.g_cc_position_count
+        doc_discrete_features.append(cc_position)
+
+        item_class_hash = int(segs[feat_name_dic['AdvancedPreferFeature_149']])
         doc_discrete_features.append(self.email_class_hash_idx_dic[item_class_hash])
-        subject_prefix_hash = int(seg_features[feat_name_dic['AdvancedPreferFeature_156']])
+        subject_prefix_hash = int(segs[feat_name_dic['AdvancedPreferFeature_156']])
         doc_discrete_features.append(self.subject_prefix_hash_idx_dic[subject_prefix_hash])
-        conversation_hash = int(seg_features[feat_name_dic['AdvancedPreferFeature_153']])
+        conversation_hash = int(segs[feat_name_dic['AdvancedPreferFeature_153']])
         doc_discrete_features.append(conversation_hash)
         # doc_discrete_features.append(self.conversation_hash_idx_dic[conversation_hash])
         return doc_cont_features, doc_discrete_features
 
-    def collect_qd_matching_features(self, seg_features, feat_name_dic):
+    def collect_qd_matching_features(self, segs, feat_name_dic):
         qd_cont_features = []
-        term0_freq_l = float(seg_features[feat_name_dic["TermFrequency_Body_0L"]])
-        term0_freq_u = float(seg_features[feat_name_dic["TermFrequency_Body_0U"]])
-        term1_freq_l = float(seg_features[feat_name_dic["TermFrequency_Body_1L"]])
-        term1_freq_u = float(seg_features[feat_name_dic["TermFrequency_Body_1U"]])
-        qd_cont_features.append(term0_freq_l + term1_freq_l)
-        qd_cont_features.append(term0_freq_u + term1_freq_u)
+        if self.args.do_feat_norm:
+            term_freq_l = float(segs[feat_name_dic["TermFrequency_Body_01L"]])
+            term_freq_u = float(segs[feat_name_dic["TermFrequency_Body_01U"]])
+        else:
+            term0_freq_l = float(segs[feat_name_dic["TermFrequency_Body_0L"]])
+            term0_freq_u = float(segs[feat_name_dic["TermFrequency_Body_0U"]])
+            term1_freq_l = float(segs[feat_name_dic["TermFrequency_Body_1L"]])
+            term1_freq_u = float(segs[feat_name_dic["TermFrequency_Body_1U"]])
+            term_freq_l = term0_freq_l + term1_freq_l
+            term_freq_u = term0_freq_u + term1_freq_u
+        qd_cont_features.append(term_freq_l)
+        qd_cont_features.append(term_freq_u)
+
         for feat in self.QUERY_DOC_MATCH_FEATURES[2:]:
-            feature = seg_features[feat_name_dic[feat]]
+            feature = segs[feat_name_dic[feat]]
             feature = 0. if not feature else float(feature)
             qd_cont_features.append(feature)
         return qd_cont_features
