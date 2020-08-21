@@ -12,15 +12,27 @@ model_name = "baseline"
 AVAILABLE_CUDA_COUNT = 2
 START_NO = 0
 
-para_names = ["data_path", "lr", "warmup_steps", "max_train_epoch", "l2_lambda", "do_feat_norm"]
-short_names = ["", "lr", "ws", "epoch", "lnorm", "fnorm"]
+para_names = ["data_path", "lr", "warmup_steps", "max_train_epoch", "l2_lambda"]
+short_names = ["", "lr", "ws", "epoch", "lnorm"]
 paras = [
-        ["by_time", 0.002, 4000, 10, 0.00001, True],
-        ["by_time", 0.002, 4000, 10, 0, True],
-        ["by_time", 0.002, 3000, 10, 0, True],
-        ["by_users", 0.002, 3000, 10, 0, True],
-        ["by_users", 0.002, 3000, 10, 0.00001, True],
-        ["by_users", 0.002, 3000, 10, 0.0001, True],
+        ["by_time", 0.002, 2000, 10, 0],
+        ["by_users", 0.002, 3000, 10, 0],
+        ["by_time", 0.002, 3000, 20, 0.00005],
+        ["by_users", 0.002, 3000, 20, 0.000005],
+        ["by_time", 0.002, 2000, 20, 0.00001],
+        ["by_users", 0.002, 3000, 20, 0.00001],
+
+        #["by_time", 0.002, 4000, 10, 0.00005],
+        #["by_users", 0.002, 3000, 10, 0.00005],
+        #["by_time", 0.002, 4000, 10, 0.00001],
+        #["by_users", 0.002, 3000, 10, 0.00001],
+        #["by_time", 0.002, 2000, 10, 0.00001],
+        #["by_users", 0.002, 3000, 10, 0.000001],
+
+        #["by_time", 0.002, 4000, 10, 0, True],
+        #["by_time", 0.002, 3000, 10, 0, True],
+        #["by_users", 0.002, 3000, 10, 0, True],
+        #["by_users", 0.002, 3000, 10, 0.0001, True],
         #["by_time", 0.002, 4000, 10, 0.00005, False],
         #["by_time", 0.002, 4000, 10, 0.00005, True],
         #["by_users", 0.002, 3000, 10, 0.00005, True, False],

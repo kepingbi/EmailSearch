@@ -46,7 +46,7 @@ def build_optim(args, model, checkpoint):
 class ContextEmailRanker(BaseEmailRanker):
     def __init__(self, args, personal_data, device):
         super(ContextEmailRanker, self).__init__(args, personal_data, device)
-        additional_dim = 0
+        self.additional_dim = 0
         add_dfeat_size = [30, 30, 30]
         if self.args.use_popularity:
             self.rating_emb_size = add_dfeat_size[0]
@@ -54,7 +54,7 @@ class ContextEmailRanker(BaseEmailRanker):
                 self.personal_data.rating_levels,
                 self.rating_emb_size,
                 padding_idx=0)
-            additional_dim += self.rating_emb_size
+            self.additional_dim += self.rating_emb_size
             #popularity
         if self.args.conv_occur:
             self.conv_occur_emb_size = add_dfeat_size[1]
@@ -62,18 +62,25 @@ class ContextEmailRanker(BaseEmailRanker):
                 self.conv_occur_emb_size, \
                 padding_idx=self.args.prev_q_limit)
             self.d_discrete_emb_list.append(self.conv_occur_emb)
-            additional_dim += self.conv_occur_emb_size
+            self.additional_dim += self.conv_occur_emb_size
         if self.args.doc_occur:
             self.doc_occur_emb_size = add_dfeat_size[2]
             self.doc_occur_emb = nn.Embedding(self.args.prev_q_limit + 1, \
                 self.doc_occur_emb_size, \
                 padding_idx=self.args.prev_q_limit)
             self.d_discrete_emb_list.append(self.doc_occur_emb)
-            additional_dim += self.doc_occur_emb_size
+            self.additional_dim += self.doc_occur_emb_size
 
-        self.discrete_dfeat_hidden_size = sum(self.discrete_dfeat_emb_size) + additional_dim
-        self.ddiscrete_W1 = nn.Linear(self.discrete_dfeat_hidden_size, self.embedding_size//2)
+        if self.additional_dim > 0:
+            self.discrete_dfeat_hidden_size = sum(self.discrete_dfeat_emb_size) \
+                + self.additional_dim
+            self.ddiscrete_W1 = nn.Linear(self.discrete_dfeat_hidden_size, self.embedding_size//2)
         #self.all_feat_hidden_size = 3 * self.embedding_size
+
+        self.context_q_batch_norm = nn.BatchNorm1d(self.args.prev_q_limit)
+        self.context_d_batch_norm = nn.BatchNorm1d(self.args.prev_q_limit)
+        self.context_qd_batch_norm = nn.BatchNorm1d(self.args.prev_q_limit)
+        self.context_attn_batch_norm = nn.BatchNorm1d(self.args.prev_q_limit)
 
         self.contextq_all_feat_W = nn.Bilinear(self.embedding_size, self.embedding_size, 1)
         self.transformer_encoder = TransformerEncoder(
@@ -156,6 +163,12 @@ class ContextEmailRanker(BaseEmailRanker):
                 candi_doc_qcont_features, candi_doc_dcont_features,
                 candi_doc_qdcont_features, candi_doc_qdiscrete_features,
                 candi_doc_ddiscrete_features, candi_doc_popularity, candi_doc_mask)
+        candi_doc_qcont_hidden = self.qcont_batch_norm(candi_doc_qcont_hidden)
+        candi_doc_dcont_hidden = self.dcont_batch_norm(candi_doc_dcont_hidden)
+        candi_doc_qdcont_hidden = self.qdcont_batch_norm(candi_doc_qdcont_hidden)
+        candi_doc_qdiscrete_hidden = self.qdiscrete_batch_norm(candi_doc_qdiscrete_hidden)
+        candi_doc_ddiscrete_hidden = self.ddiscrete_batch_norm(candi_doc_ddiscrete_hidden)
+
         # batch_size, qcont_hidden_size
         _, candi_doc_count, _ = candi_doc_dcont_hidden.size()
         candi_doc_q_hidden = torch.cat([candi_doc_qcont_hidden, candi_doc_qdiscrete_hidden], dim=-1)
@@ -163,7 +176,7 @@ class ContextEmailRanker(BaseEmailRanker):
         candi_doc_q_hidden = candi_doc_q_hidden.unsqueeze(1).expand(-1, candi_doc_count, -1)
         aggr_candi_emb = self.self_attn_weighted_avg(
             candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
-
+        aggr_candi_emb = self.attn_batch_norm(aggr_candi_emb)
         # collect the representation of the current query.
         # Current query features; current candidate documents;
         batch_size, prev_q_limit, doc_per_q, _ = context_pos_dcont_features.size()
@@ -200,27 +213,30 @@ class ContextEmailRanker(BaseEmailRanker):
                 context_qcont_features, context_pos_dcont_features,
                 context_pos_qdcont_features, context_qdiscrete_features,
                 context_pos_ddiscrete_features, context_d_popularity, context_doc_mask)
-        #context_doc_qcont_hidden = self.query_encoder(context_doc_qcont_hidden, context_doc_mask)
         context_doc_d_hidden = torch.cat(
             [context_doc_dcont_hidden, context_doc_ddiscrete_hidden], dim=-1)
 
         context_doc_d_hidden = self.query_encoder(context_doc_d_hidden, context_doc_mask)
         context_doc_qdcont_hidden = self.query_encoder(context_doc_qdcont_hidden, context_doc_mask)
-        context_doc_dcont_hidden = context_doc_dcont_hidden.view(
-            batch_size, prev_q_limit, -1)
+        # context_doc_dcont_hidden = context_doc_dcont_hidden.view(
+        #     batch_size, prev_q_limit, -1)
         context_doc_qdcont_hidden = context_doc_qdcont_hidden.view(
             batch_size, prev_q_limit, -1)
         context_doc_qdiscrete_hidden = context_doc_qdiscrete_hidden.view(
             batch_size, prev_q_limit, -1)
-        context_doc_ddiscrete_hidden = context_doc_ddiscrete_hidden.view(
-            batch_size, prev_q_limit, -1)
+        # context_doc_ddiscrete_hidden = context_doc_ddiscrete_hidden.view(
+        #     batch_size, prev_q_limit, -1)
         context_doc_q_hidden = torch.cat(
             [context_doc_qcont_hidden, context_doc_qdiscrete_hidden], dim=-1)
         context_doc_d_hidden = context_doc_d_hidden.view(
             batch_size, prev_q_limit, -1)
+        context_doc_q_hidden = self.context_q_batch_norm(context_doc_q_hidden)
+        context_doc_d_hidden = self.context_d_batch_norm(context_doc_d_hidden)
+        context_doc_qdcont_hidden = self.context_qd_batch_norm(context_doc_qdcont_hidden)
 
         aggr_context_emb = self.self_attn_weighted_avg(
             context_doc_q_hidden, context_doc_d_hidden, context_doc_qdcont_hidden)
+        aggr_context_emb = self.context_attn_batch_norm(aggr_context_emb)
         candi_doc_q_hidden = candi_doc_q_hidden[:, 0, :].unsqueeze(1) # batch_size,1,embedding_size
         context_seq_emb = torch.cat([aggr_context_emb, candi_doc_q_hidden], dim=1)
         # batch_size, prev_q_limit+1, embedding_size
@@ -228,13 +244,13 @@ class ContextEmailRanker(BaseEmailRanker):
         context_seq_mask = torch.cat(
             [context_q_mask, context_q_mask.new_ones(batch_size, 1)], dim=-1)
         context_overall_emb = self.transformer_encoder(context_seq_emb, context_seq_mask)
-        context_overall_emb = context_overall_emb.unsqueeze(1).expand_as(aggr_candi_emb)
+        expanded_context_overall_emb = context_overall_emb.unsqueeze(1).expand_as(aggr_candi_emb)
         # batch_size, candi_count, embedding_size
         # candidate score: batch_size, candi_count
-        scores = self.contextq_all_feat_W(context_overall_emb.contiguous(), aggr_candi_emb)
+        scores = self.contextq_all_feat_W(expanded_context_overall_emb.contiguous(), aggr_candi_emb)
         # or dot product, probably not as good
         scores = scores.squeeze(-1) * candi_doc_mask
-        return scores
+        return scores, context_overall_emb
 
     def get_hidden_features(self, doc_qcont_features,
                             doc_dcont_features, doc_qdcont_features, doc_qdiscrete_features,
@@ -295,8 +311,9 @@ class ContextEmailRanker(BaseEmailRanker):
 
         self.query_encoder.initialize_parameters(logger)
         self.transformer_encoder.initialize_parameters(logger)
-        nn.init.xavier_normal_(self.ddiscrete_W1.weight)
-        nn.init.constant_(self.ddiscrete_W1.bias, 0)
+        if self.additional_dim > 0:
+            nn.init.xavier_normal_(self.ddiscrete_W1.weight)
+            nn.init.constant_(self.ddiscrete_W1.bias, 0)
         nn.init.xavier_normal_(self.contextq_all_feat_W.weight)
         nn.init.constant_(self.contextq_all_feat_W.bias, 0)
 

@@ -74,7 +74,7 @@ class PersonalSearchData():
         "OriginalQueryPerStreamBM25FNorm_Exchangeemailsubjectprefix",
         "WordsFound_Exchangeemailbodypreview",
         "TermFrequency_To_0L",
-        "BM25f_simple",
+        "BM25f_simple", # "BM25f_simple"
         "DerivedLastOccurrenceRarestWord_Exchangeemailaddress",
         "DSSMSimilarity_Exchangeemailsubject",
         "DSSMSimilarity_Exchangeemailname",
@@ -403,6 +403,8 @@ class PersonalSearchData():
             line = fin.readline().strip()
             feat_col_name = line.split('\t')
             feat_name_dic = {feat_col_name[i]: i for i in range(len(feat_col_name))}
+            if "BM25f_simpleEmail" in feat_name_dic:
+                feat_name_dic["BM25f_simple"] = feat_name_dic["BM25f_simpleEmail"]
             try:
                 for line in fin:
                     line_no += 1

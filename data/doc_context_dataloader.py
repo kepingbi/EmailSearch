@@ -134,16 +134,18 @@ class DocContextDataloader(DataLoader):
 
         ##padding###
         #continous features pad float 0.0. discrete features pad 0.
-        batch_candi_doc_idxs = util.pad(batch_candi_doc_idxs, pad_id=self.doc_pad_idx)
-        batch_candi_doc_ratings = util.pad(batch_candi_doc_ratings, pad_id=0)
-        batch_candi_doc_qcont_features = util.pad(batch_candi_doc_qcont_features, pad_id=0.)
-        batch_candi_doc_qdiscrete_features = util.pad(batch_candi_doc_qdiscrete_features, pad_id=0)
+        batch_candi_doc_idxs = util.pad(batch_candi_doc_idxs, pad_id=self.doc_pad_idx, \
+            width=self.args.candi_doc_count)
+        batch_candi_doc_ratings = util.pad(batch_candi_doc_ratings, pad_id=0, \
+            width=self.args.candi_doc_count)
+        #batch_candi_doc_qcont_features = util.pad(batch_candi_doc_qcont_features, pad_id=0.)
+        #batch_candi_doc_qdiscrete_features = util.pad(batch_candi_doc_qdiscrete_features, pad_id=0)
         batch_candi_doc_dcont_features = util.pad_3d(
-            batch_candi_doc_dcont_features, pad_id=0., dim=1)
+            batch_candi_doc_dcont_features, pad_id=0., dim=1, width=self.args.candi_doc_count)
         batch_candi_doc_ddiscrete_features = util.pad_3d(
-            batch_candi_doc_ddiscrete_features, pad_id=0, dim=1)
+            batch_candi_doc_ddiscrete_features, pad_id=0, dim=1, width=self.args.candi_doc_count)
         batch_candi_doc_qdcont_features = util.pad_3d(
-            batch_candi_doc_qdcont_features, pad_id=0., dim=1)
+            batch_candi_doc_qdcont_features, pad_id=0., dim=1, width=self.args.candi_doc_count)
 
         return batch_qids, batch_user_idxs, batch_candi_doc_idxs, batch_candi_doc_ratings, \
             batch_candi_doc_qcont_features, batch_candi_doc_qdiscrete_features, \
@@ -273,30 +275,42 @@ class DocContextDataloader(DataLoader):
                 batch_candi_doc_popularity.append([])
                 batch_context_d_popularity.append([])
 
+        sum_prev_qcount = sum([len(d) for d in batch_context_qcont_features])
+        if sum_prev_qcount == 0:
+            batch_context_qcont_features[-1] = [[0.] * self.personal_data.qcont_feat_count]
+            batch_context_qdiscrete_features[-1] = [[0] * len(self.personal_data.QUERY_FEATURES[6:])]
+            batch_context_pos_dcont_features[-1] = [[[0.] * self.personal_data.dcont_feat_count]]
+            ddiscrete_feat_count = len(self.personal_data.DOC_FEATURES) \
+                - self.personal_data.dcont_feat_count
+            batch_context_pos_ddiscrete_features[-1] = [[[0] * ddiscrete_feat_count]]
+            batch_context_pos_qdcont_features[-1] = [[[0.] * self.personal_data.qdcont_feat_count]]
+
         ###paddding###
-        batch_context_qidxs = util.left_pad(batch_context_qidxs, pad_id=0)
+        batch_context_qidxs = util.left_pad(
+            batch_context_qidxs, pad_id=0, width=self.args.prev_q_limit)
         batch_context_pos_didxs = util.left_pad_3d(
-            batch_context_pos_didxs, pad_id=0, dim=1) #prev q count
+            batch_context_pos_didxs, pad_id=0, dim=1, width=self.args.prev_q_limit) #prev q count
         batch_context_pos_didxs = util.left_pad_3d(
             batch_context_pos_didxs, pad_id=0, dim=2) #doc per q
         batch_context_qcont_features = util.left_pad_3d(
-            batch_context_qcont_features, pad_id=0, dim=1) #batch_size, prev_q_limit, #features
+            batch_context_qcont_features, pad_id=0, dim=1, width=self.args.prev_q_limit)
+            #batch_size, prev_q_limit, #features
         batch_context_qdiscrete_features = util.left_pad_3d(
-            batch_context_qdiscrete_features, pad_id=0, dim=1)
+            batch_context_qdiscrete_features, pad_id=0, dim=1, width=self.args.prev_q_limit)
         batch_context_pos_dcont_features = util.left_pad_4d_dim1(
-            batch_context_pos_dcont_features, pad_id=0)
+            batch_context_pos_dcont_features, pad_id=0, width=self.args.prev_q_limit)
             #batch_size, prev_q_limit, doc_count_per_q, #features
         batch_context_pos_dcont_features = util.left_pad_4d_dim2(
             batch_context_pos_dcont_features, pad_id=0)
             #batch_size, prev_q_limit, doc_count_per_q, #features
         batch_context_pos_ddiscrete_features = util.left_pad_4d_dim1(
-            batch_context_pos_ddiscrete_features, pad_id=0)
+            batch_context_pos_ddiscrete_features, pad_id=0, width=self.args.prev_q_limit)
             #batch_size, prev_q_limit, doc_count_per_q, #features
         batch_context_pos_ddiscrete_features = util.left_pad_4d_dim2(
             batch_context_pos_ddiscrete_features, pad_id=0)
             #batch_size, prev_q_limit, doc_count_per_q, #features
         batch_context_pos_qdcont_features = util.left_pad_4d_dim1(
-            batch_context_pos_qdcont_features, pad_id=0)
+            batch_context_pos_qdcont_features, pad_id=0, width=self.args.prev_q_limit)
         batch_context_pos_qdcont_features = util.left_pad_4d_dim2(
             batch_context_pos_qdcont_features, pad_id=0)
         # batch_candi_doc_idxs already padded.

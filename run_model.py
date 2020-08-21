@@ -9,21 +9,44 @@ DATA_PATH = "%s" % INPUT_DIR # hist_len
 
 script_path = "python main.py"
 model_name = "pos_doc_context"
-AVAILABLE_CUDA_COUNT = 4
+AVAILABLE_CUDA_COUNT = 2
 START_NO = 2
 
-para_names = ["data_path", "use_popularity", "conv_occur", "doc_occur", \
+#para_names = ["data_path", "use_popularity", "conv_occur", "doc_occur", \
+para_names = ["data_path", "embedding_size", \
         "ff_size", "heads", "inter_layers", "lr", "warmup_steps", \
-        "max_train_epoch", "l2_lambda", "do_feat_norm"]
-short_names = ["", "usepop", "conv", "doc", "ff", "h", "layer", "lr", \
-        "ws", "epoch", "lnorm","fnorm"]
+        "max_train_epoch", "l2_lambda", "prev_q_limit"]
+short_names = ["", "embsize", "ff", "h", "layer", "lr", \
+        "ws", "epoch", "lnorm", "prevq"]
 paras = [
+        #("by_time", 128, 512, 8, 2, 0.002, 1000, 10, 0.00005),
+        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10), # best
+        #("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.000001, 10),
+        #("by_time", 128, 512, 8, 2, 0.002, 4000, 10, 0.00005, 10),
+        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10), # best
+        #("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00005, 10),
+        #("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.000005, 10),
+
+        #("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.0001),
+        #("by_time", 128, 512, 8, 2, 0.002, 1000, 10, 0.00001),
+
+        #("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.0000005),
+        #("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.0000001),
+        #("by_users", 128, 512, 8, 2, 0.002, 2000, 10, 0.000005),
+
         #("by_time", False, False, False, 512, 8, 2, 0.002, 3000, 10, 0),
         #("by_time", False, False, False, 512, 8, 2, 0.002, 3000, 10, 0.00005),
-        ("by_time", False, False, False, 512, 8, 2, 0.002, 4000, 10, 0.00005, False),
-        ("by_users", False, False, False, 512, 8, 2, 0.002, 3000, 10, 0.00001, False),
+        #("by_time", False, False, False, 512, 8, 2, 0.002, 3000, 10, 0.00005, False),
+        #("by_time", False, False, False, 512, 8, 2, 0.002, 2000, 10, 0.00005, False), # best
+        #("by_time", False, False, False, 512, 8, 2, 0.002, 4000, 10, 0.00001, False),
+        #("by_time", False, False, False, 512, 8, 2, 0.002, 4000, 10, 0, False),
+        #("by_users", False, False, False, 512, 8, 2, 0.002, 3000, 10, 0.00001, False),
+        #("by_users", False, False, False, 512, 8, 2, 0.002, 3000, 10, 0, False),
+        #("by_users", False, False, False, 512, 8, 2, 0.002, 4000, 10, 0, False),
+        #("by_users", False, False, False, 512, 8, 2, 0.002, 3000, 10, 0.000005, False),
+        #("by_users", False, False, False, 512, 8, 2, 0.002, 3000, 10, 0.000001, False), # best
         #("by_time", False, False, False, 512, 8, 2, 0.002, 2000, 10, 0.00005),
-        #("by_time", False, False, False, 512, 8, 2, 0.002, 4000, 10, 0.00005),
+        #("by_time", False, False, False, 512, 8, 2, 0.002, 4000, 10, 0.00005), # best
         #("by_time", False, False, False, 512, 8, 2, 0.002, 3000, 10, 0.00005),
         #("by_time", False, False, False, 512, 8, 2, 0.002, 2000, 10, 0.00005),
         #("by_time", False, False, False, 512, 8, 2, 0.002, 3000, 10, 0.00001),
@@ -56,10 +79,10 @@ if __name__ == '__main__':
         fname = "%s.cuda%d.sh" % (model_name, cuda_no)
         f = open(fname, 'w')
         f_dic[cuda_no] = f
-    cuda_no = START_NO
+    cuda_no = 0
     for para in paras:
         cmd_arr = []
-        cmd_arr.append("CUDA_VISIBLE_DEVICES=%d" % cuda_no)
+        cmd_arr.append("CUDA_VISIBLE_DEVICES=%d" % (cuda_no + START_NO))
         cmd_arr.append(script_path)
         #cmd_arr.append("--l2_lambda 0.00005")
         cmd_arr.append("--hist_len %s" % hist_len) # important

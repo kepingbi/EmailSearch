@@ -124,7 +124,7 @@ class Trainer(object):
         dataloader = self.ExpDataloader(
             args, valid_dataset, batch_size=args.batch_size,
             shuffle=False, num_workers=args.num_workers)
-        all_query_idxs, all_user_idxs, all_doc_idxs, all_doc_scores, all_doc_ratings, _ \
+        all_query_idxs, all_user_idxs, all_doc_idxs, all_doc_scores, all_doc_ratings, _, _ \
             = self.get_doc_scores(args, dataloader, description)
         print(all_doc_scores.shape)
         sorted_doc_idxs = all_doc_scores.argsort(axis=-1)[:, ::-1]
@@ -133,37 +133,45 @@ class Trainer(object):
         ndcg = self.calc_metrics_ndcg(sorted_doc_idxs, all_doc_ratings)
         return mrr, prec, ndcg
 
-    def test(self, args, global_data, partition, rankfname="test.best_model.ranklist", cutoff=50):
+    def test(self, args, global_data, partition,
+             rankfname="test.best_model.ranklist",
+             cutoff=50, coll_context_emb=False):
         test_dataset = self.ExpDataset(args, global_data, partition)
         dataloader = self.ExpDataloader(
             args, test_dataset, batch_size=args.batch_size, #batch_size
             shuffle=False, num_workers=args.num_workers)
         all_query_idxs, all_user_idxs, all_doc_idxs, all_doc_scores, \
-            all_doc_ratings, all_context_qcounts \
-            = self.get_doc_scores(args, dataloader, "Test")
+            all_doc_ratings, all_context_qcounts, all_context_emb \
+            = self.get_doc_scores(args, dataloader, "Test", coll_context_emb)
         print(all_doc_scores.shape)
         sorted_doc_idxs = all_doc_scores.argsort(axis=-1)[:, ::-1]
         #by default axis=-1, along the last axis
-        mrr, prec = self.calc_metrics(sorted_doc_idxs, all_doc_ratings)
-        ndcg = self.calc_metrics_ndcg(sorted_doc_idxs, all_doc_ratings)
+        mrr, prec = self.calc_metrics(sorted_doc_idxs, all_doc_ratings, cutoff)
+        ndcg = self.calc_metrics_ndcg(sorted_doc_idxs, all_doc_ratings, cutoff)
         logger.info("Test {}: NDCG:{} MRR:{} P@1:{}".format(partition, ndcg, mrr, prec))
         output_path = os.path.join(args.save_dir, rankfname) + '.gz'
         eval_count = all_doc_scores.shape[0]
         with gzip.open(output_path, 'wt') as rank_fout:
             for i in range(eval_count):
-                user_id = all_user_idxs[i]
+                user_id = global_data.user_idx_list[all_user_idxs[i]]
+                # all_user_idxs[i] is the mapped id, not the original id
                 qidx = all_query_idxs[i]
                 prev_qcount = all_context_qcounts[i] if args.model_name != "baseline" else 0
                 ranked_doc_ids = all_doc_idxs[i][sorted_doc_idxs[i]]
                 ranked_doc_scores = all_doc_scores[i][sorted_doc_idxs[i]]
+                if len(all_context_emb) > 0:
+                    query_context_emb = all_context_emb[i] # embedding_size
                 doc_ranklist = []
                 for arr_idx in sorted_doc_idxs[i]:
                     doc_id = all_doc_idxs[i][arr_idx]
                     doc_score = all_doc_scores[i][arr_idx]
                     doc_rating = all_doc_ratings[i][arr_idx]
                     doc_ranklist.append("{}:{}:{:.4f}".format(doc_id, doc_rating, doc_score))
-
-                line = "{}@{}@{}\t{}\n".format(qidx, user_id, prev_qcount, ";".join(doc_ranklist))
+                context_emb_str = ""
+                if len(all_context_emb) > 0:
+                    context_emb_str = "@" + ",".join(["{}".format(x) for x in query_context_emb])
+                line = "{}@{}@{}{}\t{}\n".format(
+                    qidx, user_id, prev_qcount, context_emb_str, ";".join(doc_ranklist))
                 rank_fout.write(line)
 
     def calc_metrics(self, sorted_doc_idxs, doc_ratings, cutoff=50):
@@ -211,17 +219,17 @@ class Trainer(object):
             "EvalCount:{} ValidEvalCount:{} NDCG@5:{}".format(eval_count, valid_eval_count, ndcg))
         return ndcg
 
-    def get_doc_scores(self, args, dataloader, description):
+    def get_doc_scores(self, args, dataloader, description, coll_context_emb=False):
         self.model.eval()
         with torch.no_grad():
             pbar = tqdm(dataloader)
             pbar.set_description(description)
             all_doc_scores, all_doc_ratings, all_doc_idxs = [], [], []
             all_user_idxs, all_query_idxs = [], []
-            all_context_qcounts = []
+            all_context_qcounts, all_context_emb = [], []
             for batch_data in pbar:
                 batch_data = batch_data.to(args.device)
-                batch_scores = self.model.test(batch_data)
+                batch_scores, batch_context_emb = self.model.test(batch_data)
                 #batch_size, candidate_doc_count
                 all_user_idxs.extend(batch_data.user_idxs.tolist())
                 all_query_idxs.extend(batch_data.query_idxs.tolist())
@@ -235,6 +243,9 @@ class Trainer(object):
                     candi_doc_idxs = candi_doc_idxs.cpu()
                 all_doc_idxs.extend(candi_doc_idxs.tolist())
                 all_doc_scores.extend(batch_scores.cpu().tolist())
+                if coll_context_emb and batch_context_emb is not None:
+                    all_context_emb.extend(batch_context_emb.cpu().tolist())
+                    # embedding_size
                 all_doc_ratings.extend(candi_doc_ratings.cpu().tolist())
                 #use MRR
         all_doc_idxs = util.pad(all_doc_idxs, pad_id=-1)
@@ -245,6 +256,6 @@ class Trainer(object):
             = map(np.asarray,
                   [all_query_idxs, all_user_idxs, all_doc_idxs, \
                       all_doc_scores, all_doc_ratings, all_context_qcounts])
-
+        all_context_emb = np.asarray(all_context_emb, dtype=np.float32)
         return  all_query_idxs, all_user_idxs, all_doc_idxs, \
-            all_doc_scores, all_doc_ratings, all_context_qcounts
+            all_doc_scores, all_doc_ratings, all_context_qcounts, all_context_emb

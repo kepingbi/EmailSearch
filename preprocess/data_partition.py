@@ -87,7 +87,7 @@ QUERY_DOC_MATCH_FEATURES = [
     "OriginalQueryPerStreamBM25FNorm_Exchangeemailsubjectprefix",
     "WordsFound_Exchangeemailbodypreview",
     "TermFrequency_To_0L",
-    "BM25f_simple",
+    "BM25f_simple", 
     "DerivedLastOccurrenceRarestWord_Exchangeemailaddress",
     "DSSMSimilarity_Exchangeemailsubject",
     "DSSMSimilarity_Exchangeemailname",
@@ -413,6 +413,7 @@ def read_qutime(fname, arr_list):
     print("Read %s" % fname)
     with gzip.open(fname, 'rt') as fin:
         line = fin.readline().strip() # head
+        #there is no head in udata, so one qid is missing sometimes
         for line in fin:
             segs = line.strip().split(' ')
             qid, uid, search_time = map(int, segs)
@@ -618,14 +619,15 @@ def filter_train(data_path, hist_len=4, hist_ubound=10, ratio=0.1):
 def read_qid_from_file(fname, q_set):
     with gzip.open(fname, 'rt') as fin:
         line = fin.readline() # head line
+        #no headline in udata, so one line is missing
         for line in fin:
             line = line.strip()
             qid, uid, _ = line.split() # qid, uid, search_time
             q_set.add(int(qid))
 
-def collect_all_qset(data_path, hist_len):
+def collect_all_qset(data_path):
     qset = set()
-    train_qid_file = "%s/filter_hl%d_train_qids.txt.gz" % (data_path, hist_len)
+    train_qid_file = "%s/train_qids.txt.gz" % (data_path)
     valid_qid_file = "%s/valid_qids.txt.gz" % (data_path)
     test_qid_file = "%s/test_qids.txt.gz" % (data_path)
     read_qid_from_file(train_qid_file, qset)
@@ -646,11 +648,14 @@ def output_new_feat_file(featfile_list, qset, output_feat_file):
                 line = fin.readline().strip('\r\n')
                 feat_col_name = line.split('\t')
                 feat_name_dic = {feat_col_name[i]: i for i in range(len(feat_col_name))}
+                if "BM25f_simpleEmail" in feat_name_dic:
+                    feat_name_dic["BM25f_simple"] = feat_name_dic["BM25f_simpleEmail"]
+                # feat_name_dic may have one more element than feat_col_name
                 qid_column = feat_name_dic['m:QueryId']
                 kept_column_ids = sorted([feat_name_dic[x] for x in feat_name_dic \
                     if x.startswith('m:') or x in feature_sets])
                 print(kept_column_ids)
-                kept_column_ids = [x if x < len(feat_name_dic) - 50 else x - len(feat_name_dic) \
+                kept_column_ids = [x if x < len(feat_col_name) - 50 else x - len(feat_col_name) \
                     for x in kept_column_ids] # hard rule to avoid exception
                 # some lines have different columns that will cause out of index exception
                 print(kept_column_ids)
@@ -834,6 +839,11 @@ def main():
         read_qid_from_file(samplefname, qset)
         output_feat_file = "%s/extract_sample%.2f_feat_file.txt.gz" % (
             paras.data_path, paras.rnd_ratio)
+        # fname_list = ["%s/extract_sample%.2f_feat_file.txt.gz" % (
+        #     paras.data_path, paras.rnd_ratio)]
+        # qset = collect_all_qset("%s/by_time" % paras.data_path)
+        # output_feat_file = "%s/extract_sample%.2f_hist_len11_feat_file.txt.gz" % (
+        #     paras.data_path, paras.rnd_ratio)
         output_new_feat_file(fname_list, qset, output_feat_file)
     elif paras.option == "filter_users": # overall filter
         samplefname = "%s/sample%.2f_udata.gz" % (paras.data_path, paras.rnd_ratio)

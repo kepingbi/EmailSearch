@@ -153,7 +153,11 @@ def eval_rankfile_detail(rank_file, rank_cut_offs):
         for line in frank:
             line = line.strip('\n')
             segs = line.split('\t')
-            qid, uid, prev_qcount = map(int, segs[0].split('@'))
+            query_infos = segs[0].split('@')
+            qid = int(query_infos[0])
+            uid = query_infos[1]
+            prev_qcount = int(query_infos[2])
+            # maybe len(query_infos) > 3
             prev_qcount_dic[qid] = prev_qcount
             ranklist = segs[1].split(';')
             doc_ratings = [int(x.split(':')[1]) for x in ranklist]
@@ -169,7 +173,8 @@ def eval_rankfile_detail(rank_file, rank_cut_offs):
             for i, cutoff in enumerate(rank_cut_offs):
                 session_q_ndcg[i][qid] = sum(dcg_list[:cutoff]) / sum(idcg_list[:cutoff])
                 session_q_err[i][qid] = sum(err_list[:cutoff])
-                session_q_precision[i][qid] = (0.0 + sum(doc_hit[:cutoff])) / len(doc_ratings[:cutoff])
+                session_q_precision[i][qid] = \
+                    (0.0 + sum(doc_hit[:cutoff])) / len(doc_ratings[:cutoff])
 
             session_q_ndcg[-1][qid] = sum(dcg_list) / sum(idcg_list)
             session_q_err[-1][qid] = sum(err_list)

@@ -78,7 +78,7 @@ def parse_args():
                         help="log file name")
     parser.add_argument("--use_popularity", type=str2bool, nargs='?', const=True, default=False,
                         help="Use documents' recent popularity as representation or not.")
-    parser.add_argument("--do_feat_norm", type=str2bool, nargs='?', const=True, default=True,
+    parser.add_argument("--do_feat_norm", type=str2bool, nargs='?', const=True, default=False,
                         help="Whether to do feature normalization for continuous features.")
     parser.add_argument("--doc_occur", type=str2bool, nargs='?', const=True, default=False,
                         help="Use the position doc occur in the past or not.")
@@ -112,7 +112,7 @@ def parse_args():
                         help="the number of users previous reviews used.")
     parser.add_argument("--doc_limit_per_q", type=int, default=2,
                         help="the number of item's previous reviews used.")
-    parser.add_argument("--max_train_epoch", type=int, default=10,
+    parser.add_argument("--max_train_epoch", type=int, default=5,
                         help="Limit on the epochs of training (0: no limit).")
     parser.add_argument("--start_epoch", type=int, default=0,
                         help="the epoch where we start training.")
@@ -213,10 +213,17 @@ def get_doc_scores(args):
     model_path = os.path.join(args.save_dir, 'model_best.ckpt')
     best_model, _ = create_model(args, global_data, model_path)
     trainer = Trainer(args, best_model, None)
-
-    trainer.test(args, global_data, "test", args.rankfname)
-    trainer.test(args, global_data, "valid", args.rankfname.replace("test", "valid"))
-    trainer.test(args, global_data, "train", args.rankfname.replace("test", "train"))
+    rankfname = args.rankfname
+    coll_context_emb = False
+    if args.model_name == "pos_doc_context":
+        rankfname = "test.context.best_model.ranklist"
+        coll_context_emb = True
+    trainer.test(args, global_data, "test", \
+        rankfname, coll_context_emb=coll_context_emb)
+    trainer.test(args, global_data, "valid", \
+        rankfname.replace("test", "valid"), coll_context_emb=coll_context_emb)
+    trainer.test(args, global_data, "train", \
+        rankfname.replace("test", "train"), coll_context_emb=coll_context_emb)
 
 def main(args):
     if not os.path.isdir(args.save_dir):

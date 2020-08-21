@@ -133,13 +133,18 @@ class BaseEmailRanker(nn.Module):
             # self.conversation_hash_emb,
         self.qcont_W1 = nn.Linear(
             self.personal_data.qcont_feat_count, self.args.embedding_size//2)
+        self.qcont_batch_norm = nn.BatchNorm1d(self.args.embedding_size//2)
         self.dcont_W1 = nn.Linear(
             self.personal_data.dcont_feat_count, self.args.embedding_size//2)
+        self.dcont_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
         self.qdcont_W1 = nn.Linear(
             self.personal_data.qdcont_feat_count, self.args.embedding_size)
+        self.qdcont_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
         self.qdiscrete_W1 = nn.Linear(sum(self.discrete_qfeat_emb_size), int(self.embedding_size/2))
+        self.qdiscrete_batch_norm = nn.BatchNorm1d(self.args.embedding_size//2)
         self.discrete_dfeat_hidden_size = sum(self.discrete_dfeat_emb_size) # + self.rating_emb_size
         self.ddiscrete_W1 = nn.Linear(self.discrete_dfeat_hidden_size, int(self.embedding_size/2))
+        self.ddiscrete_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
         self.emb_dropout = args.dropout
         self.attn_W1 = nn.Linear(self.embedding_size, self.embedding_size)
         if self.args.qinteract:
@@ -147,6 +152,7 @@ class BaseEmailRanker(nn.Module):
         else:
             self.final_layer = nn.Linear(self.embedding_size, 1)
         self.dropout_layer = nn.Dropout(p=args.dropout)
+        self.attn_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
 
         #for each q,u,i
         #Q, previous purchases of u, current available reviews for i, padding value
@@ -165,9 +171,9 @@ class BaseEmailRanker(nn.Module):
         #candi_doc_mask = candi_doc_idxs.ne(self.personal_data.doc_pad_idx)
 
         # batch_size, candi_count
-        doc_scores = self.compute_candi_doc_scores(batch_data)
+        doc_scores, context_emb = self.compute_candi_doc_scores(batch_data)
         # mask already applied when computing the scores.
-        return doc_scores
+        return doc_scores, context_emb
 
     def forward(self, batch_data):
         candi_doc_ratings = batch_data.candi_doc_ratings
@@ -175,8 +181,9 @@ class BaseEmailRanker(nn.Module):
         candi_doc_mask = candi_doc_idxs.ne(self.personal_data.doc_pad_idx)
 
         # batch_size, candi_count
-        doc_scores = self.compute_candi_doc_scores(batch_data)
-        loss = -self.logsoftmax(doc_scores) * candi_doc_ratings.float()
+        doc_scores, _ = self.compute_candi_doc_scores(batch_data)
+        #loss = -self.logsoftmax(doc_scores) * candi_doc_ratings.float()
+        loss = -self.logsoftmax(doc_scores) * (candi_doc_ratings.float().exp()-1)
         loss = loss * candi_doc_mask.float()
         loss = loss.sum(-1).mean()
         return loss
@@ -210,7 +217,7 @@ class BaseEmailRanker(nn.Module):
 
         aggr_candi_emb = self.self_attn_weighted_avg(
             candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
-
+        aggr_candi_emb = self.attn_batch_norm(aggr_candi_emb)
         # collect the representation of the current query.
         # Current query features; current candidate documents;
         if self.args.qinteract:
@@ -219,7 +226,7 @@ class BaseEmailRanker(nn.Module):
             scores = self.final_layer(aggr_candi_emb)
         # or dot product, probably not as good
         scores = scores.squeeze(-1) * candi_doc_mask
-        return scores
+        return scores, None
 
     def self_attn_weighted_avg(self, doc_q_hidden, doc_d_hidden, doc_qdcont_hidden):
         ''' doc_q_hidden: batch_size, pre_q_limit/candi_count, embedding_size
@@ -247,6 +254,10 @@ class BaseEmailRanker(nn.Module):
         doc_qcont_hidden = torch.tanh(self.qcont_W1(doc_qcont_features))
         doc_dcont_hidden = torch.tanh(self.dcont_W1(doc_dcont_features))
         doc_qdcont_hidden = torch.tanh(self.qdcont_W1(doc_qdcont_features))
+
+        doc_qcont_hidden = self.qcont_batch_norm(doc_qcont_hidden)
+        doc_dcont_hidden = self.dcont_batch_norm(doc_dcont_hidden)
+        doc_qdcont_hidden = self.qdcont_batch_norm(doc_qdcont_hidden)
         # batch_size, qdiscrete_feature_count
         # cat_qdiscret_list = []
         # for idx in range(len(self.q_discrete_emb_list)):
@@ -267,6 +278,10 @@ class BaseEmailRanker(nn.Module):
         # the last index conversation hash not used
         # concatenate with the popularity embedding
         doc_ddiscrete_hidden = torch.tanh(self.ddiscrete_W1(doc_ddiscrete_mapped))
+
+        doc_qdiscrete_hidden = self.qdiscrete_batch_norm(doc_qdiscrete_hidden)
+        doc_ddiscrete_hidden = self.ddiscrete_batch_norm(doc_ddiscrete_hidden)
+
         return doc_qcont_hidden, doc_dcont_hidden, doc_qdcont_hidden, \
             doc_qdiscrete_hidden, doc_ddiscrete_hidden
 
