@@ -15,15 +15,39 @@ START_NO = 2
 #para_names = ["data_path", "use_popularity", "conv_occur", "doc_occur", \
 para_names = ["data_path", "embedding_size", \
         "ff_size", "heads", "inter_layers", "lr", "warmup_steps", \
-        "max_train_epoch", "l2_lambda", "prev_q_limit"]
+        "max_train_epoch", "l2_lambda", "prev_q_limit", "use_pos_emb", \
+            "qfeat", "dfeat", "qdfeat", "do_curq"]
 short_names = ["", "embsize", "ff", "h", "layer", "lr", \
-        "ws", "epoch", "lnorm", "prevq"]
+        "ws", "epoch", "lnorm", "prevq", "pos", "q", "d", "qd", "curq"]
 paras = [
+        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, True, True, True, True),
+        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, True, True, True, False),
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, False, False, True, False),
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, False, True, False, False),
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, False, True, True, False),
+
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, False, True, True, True, True),
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 5, True, True, True, True, True),
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 15, True, True, True, True, True),
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 20, True, True, True, True, True),
+
+        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, True),
+        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, False),
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, False, False, True, False),
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, False, True, False, False),
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, False, True, True, False),
+
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, False, True, True, True, True),
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 5, True, True, True, True, True),
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 15, True, True, True, True, True),
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 20, True, True, True, True, True),
+
+
         #("by_time", 128, 512, 8, 2, 0.002, 1000, 10, 0.00005),
-        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10), # best
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10), # best, linear label
         #("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.000001, 10),
         #("by_time", 128, 512, 8, 2, 0.002, 4000, 10, 0.00005, 10),
-        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10), # best
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10), # best
         #("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00005, 10),
         #("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.000005, 10),
 
@@ -74,19 +98,21 @@ paras = [
 
 if __name__ == '__main__':
     f_dic = dict()
-    for cuda_no in range(START_NO, START_NO + AVAILABLE_CUDA_COUNT):
+    cuda_no = 0
+    for _ in range(AVAILABLE_CUDA_COUNT):
         cuda_no = cuda_no % AVAILABLE_CUDA_COUNT
-        fname = "%s.cuda%d.sh" % (model_name, cuda_no)
+        fname = "%s.cuda%d.sh" % (model_name, cuda_no + START_NO)
         f = open(fname, 'w')
         f_dic[cuda_no] = f
+        cuda_no += 1
     cuda_no = 0
     for para in paras:
         cmd_arr = []
         cmd_arr.append("CUDA_VISIBLE_DEVICES=%d" % (cuda_no + START_NO))
         cmd_arr.append(script_path)
-        #cmd_arr.append("--l2_lambda 0.00005")
         cmd_arr.append("--hist_len %s" % hist_len) # important
         cmd_arr.append("--model_name %s" % model_name)
+        cmd_arr.append("--mode test") # TODO: comment this line for training
         cmd_arr.append("--data_dir %s/%s" % (DATA_PATH, para[0]))
         cmd_arr.append("--input_dir %s" % (INPUT_DIR))
         #cmd_arr.append("--eval_train") # evaluate performance on training set after each epoch

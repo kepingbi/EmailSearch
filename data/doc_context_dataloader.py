@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 import others.util as util
 from data.batch_data import DocContextBatch, DocBaselineBatch
 from data.data_util import PersonalSearchData
-
+import random
 
 class DocContextDataloader(DataLoader):
     ''' Data loaded as batches and converted to gpu tensor
@@ -20,6 +20,7 @@ class DocContextDataloader(DataLoader):
             pin_memory=pin_memory, drop_last=drop_last, timeout=timeout,
             worker_init_fn=worker_init_fn, collate_fn=self._collate_fn)
         self.args = args
+        random.seed(567)
         # {"NotAppear":0, "Bad":1, "Fair":2, "Good":3, "Excellent":4, "Perfect":5}
         self.prev_q_limit = args.prev_q_limit
         self.personal_data = self.dataset.personal_data
@@ -166,10 +167,15 @@ class DocContextDataloader(DataLoader):
             batch_candi_doc_idxs, batch_candi_doc_conv_hashes): #request id
 
             uid, idx = self.personal_data.query_info_dic[qid][-1]
-            #position of qid in the sequence of queries the user issued.
-            prev_qidxs = [qidx for qidx, _ in \
-                self.personal_data.u_queries_dic[uid][:idx][-self.args.prev_q_limit:]]
             #qidx, search_time
+            #position of qid in the sequence of queries the user issued.
+            all_prev_qidxs = [qidx for qidx, _ in self.personal_data.u_queries_dic[uid][:idx]]
+            if self.args.rand_prev:
+                prev_qidxs = random.sample(all_prev_qidxs, self.args.prev_q_limit)
+            else:
+                prev_qidxs = all_prev_qidxs[-self.args.prev_q_limit:]
+            # prev_qidxs = [qidx for qidx, _ in \
+            #     self.personal_data.u_queries_dic[uid][:idx][-self.args.prev_q_limit:]]
             batch_context_qidxs.append(prev_qidxs)
             context_pos_idxs = [] # list of positive document for each query.
             # e.g., [[2,3],[1],[5]], #pos * prev_q_limit

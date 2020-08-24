@@ -150,7 +150,8 @@ class BaseEmailRanker(nn.Module):
         if self.args.qinteract:
             self.qInteractFeatW = nn.Bilinear(self.embedding_size, self.embedding_size, 1)
         else:
-            self.final_layer = nn.Linear(self.embedding_size, 1)
+            self.mlp_layer = nn.Linear(self.embedding_size, self.embedding_size//2)
+            self.final_layer = nn.Linear(self.embedding_size//2, 1)
         self.dropout_layer = nn.Dropout(p=args.dropout)
         self.attn_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
 
@@ -182,8 +183,8 @@ class BaseEmailRanker(nn.Module):
 
         # batch_size, candi_count
         doc_scores, _ = self.compute_candi_doc_scores(batch_data)
-        #loss = -self.logsoftmax(doc_scores) * candi_doc_ratings.float()
-        loss = -self.logsoftmax(doc_scores) * (candi_doc_ratings.float().exp()-1)
+        loss = -self.logsoftmax(doc_scores) * candi_doc_ratings.float()
+        # loss = -self.logsoftmax(doc_scores) * (candi_doc_ratings.float().exp()-1)
         loss = loss * candi_doc_mask.float()
         loss = loss.sum(-1).mean()
         return loss
@@ -213,32 +214,42 @@ class BaseEmailRanker(nn.Module):
         candi_doc_q_hidden = torch.cat([candi_doc_qcont_hidden, candi_doc_qdiscrete_hidden], dim=-1)
         candi_doc_d_hidden = torch.cat([candi_doc_dcont_hidden, candi_doc_ddiscrete_hidden], dim=-1)
         _, candi_doc_count = candi_doc_idxs.size()
-        candi_doc_q_hidden = candi_doc_q_hidden.unsqueeze(1).expand(-1, candi_doc_count, -1)
+
+        expanded_candi_doc_q_hidden = candi_doc_q_hidden.unsqueeze(1).expand(\
+            -1, candi_doc_count, -1)
 
         aggr_candi_emb = self.self_attn_weighted_avg(
-            candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
+            expanded_candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
         aggr_candi_emb = self.attn_batch_norm(aggr_candi_emb)
         # collect the representation of the current query.
         # Current query features; current candidate documents;
         if self.args.qinteract:
-            scores = self.qInteractFeatW(candi_doc_q_hidden.contiguous(), aggr_candi_emb)
+            scores = self.qInteractFeatW(expanded_candi_doc_q_hidden.contiguous(), aggr_candi_emb)
         else:
-            scores = self.final_layer(aggr_candi_emb)
+            scores = self.final_layer(torch.tanh(self.mlp_layer(aggr_candi_emb)))
         # or dot product, probably not as good
         scores = scores.squeeze(-1) * candi_doc_mask
-        return scores, None
+        return scores, candi_doc_q_hidden
 
-    def self_attn_weighted_avg(self, doc_q_hidden, doc_d_hidden, doc_qdcont_hidden):
+    def self_attn_weighted_avg(self, doc_q_hidden, doc_d_hidden, doc_qdcont_hidden, is_candidate=True):
         ''' doc_q_hidden: batch_size, pre_q_limit/candi_count, embedding_size
             doc_d_hidden: batch_size, pre_q_limit/candi_count, embedding_size
             doc_qd_hidden: batch_size, pre_q_limit/candi_count, embedding_size
         '''
-        doc_q_hidden = torch.tanh(self.attn_W1(doc_q_hidden))
-        doc_d_hidden = torch.tanh(self.attn_W1(doc_d_hidden))
-        doc_qdcont_hidden = torch.tanh(self.attn_W1(doc_qdcont_hidden))
+        all_feat_arr = []
+        if self.args.qfeat or is_candidate:
+            doc_q_hidden = torch.tanh(self.attn_W1(doc_q_hidden))
+            all_feat_arr.append(doc_q_hidden)
+        if self.args.dfeat or is_candidate:
+            doc_d_hidden = torch.tanh(self.attn_W1(doc_d_hidden))
+            all_feat_arr.append(doc_d_hidden)
+        if self.args.qdfeat or is_candidate:
+            doc_qdcont_hidden = torch.tanh(self.attn_W1(doc_qdcont_hidden))
+            all_feat_arr.append(doc_qdcont_hidden)
         all_units = torch.stack(
-            [doc_q_hidden, doc_d_hidden, doc_qdcont_hidden], dim=-2)
+            all_feat_arr, dim=-2)
             # batch_size, prev_q_limit/candi_count, 3, embedding_size
+
         attn = torch.softmax(torch.matmul(all_units, all_units.transpose(2, 3)), dim=-1)
         attn = self.dropout_layer(attn)
         # batch_size, prev_q_limit/candi_count, 3, 3

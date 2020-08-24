@@ -9,18 +9,24 @@ DATA_PATH = "%s" % INPUT_DIR # hist_len
 
 script_path = "python main.py"
 model_name = "baseline"
-AVAILABLE_CUDA_COUNT = 2
-START_NO = 0
+AVAILABLE_CUDA_COUNT = 1
+START_NO = 3
 
-para_names = ["data_path", "lr", "warmup_steps", "max_train_epoch", "l2_lambda"]
-short_names = ["", "lr", "ws", "epoch", "lnorm"]
+para_names = ["data_path", "lr", "warmup_steps", "max_train_epoch", "l2_lambda"] #, "qinteract"]
+short_names = ["", "lr", "ws", "epoch", "lnorm"] #, "qinter"]
 paras = [
-        ["by_time", 0.002, 2000, 10, 0],
-        ["by_users", 0.002, 3000, 10, 0],
-        ["by_time", 0.002, 3000, 20, 0.00005],
-        ["by_users", 0.002, 3000, 20, 0.000005],
-        ["by_time", 0.002, 2000, 20, 0.00001],
         ["by_users", 0.002, 3000, 20, 0.00001],
+        ["by_time", 0.002, 3000, 20, 0.00005],
+
+        # ["by_time", 0.002, 3000, 20, 0.00005, False],
+        # ["by_users", 0.002, 3000, 20, 0.00001, False],
+
+        # ["by_time", 0.002, 2000, 10, 0],
+        # ["by_users", 0.002, 3000, 10, 0],
+        # ["by_time", 0.002, 3000, 20, 0.00005],
+        # ["by_users", 0.002, 3000, 20, 0.000005],
+        # ["by_time", 0.002, 2000, 20, 0.00001],
+        # ["by_users", 0.002, 3000, 20, 0.00001],
 
         #["by_time", 0.002, 4000, 10, 0.00005],
         #["by_users", 0.002, 3000, 10, 0.00005],
@@ -57,20 +63,23 @@ paras = [
 
 if __name__ == '__main__':
     f_dic = dict()
-    for cuda_no in range(START_NO, START_NO + AVAILABLE_CUDA_COUNT):
+    cuda_no = 0
+    for _ in range(AVAILABLE_CUDA_COUNT):
         cuda_no = cuda_no % AVAILABLE_CUDA_COUNT
-        fname = "%s.cuda%d.sh" % (model_name, cuda_no)
+        fname = "%s.cuda%d.sh" % (model_name, cuda_no + START_NO)
         f = open(fname, 'w')
         f_dic[cuda_no] = f
-    cuda_no = START_NO
+        cuda_no += 1
+    cuda_no = 0
     for para in paras:
         cmd_arr = []
-        cmd_arr.append("CUDA_VISIBLE_DEVICES=%d" % cuda_no)
+        cmd_arr.append("CUDA_VISIBLE_DEVICES=%d" % (cuda_no + START_NO))
         cmd_arr.append(script_path)
         cmd_arr.append("--hist_len %s" % hist_len) # important
         cmd_arr.append("--model_name %s" % model_name)
         cmd_arr.append("--data_dir %s/%s" % (DATA_PATH, para[0]))
         cmd_arr.append("--input_dir %s" % (INPUT_DIR))
+        #cmd_arr.append("--eval_train") # evaluate performance on training set after each epoch
         run_name = "_".join(["{}{}".format(x,y) for x,y in zip(short_names, para)])
         save_dir = "~/data/working/%s/%s" % (model_name, run_name)
         cmd_arr.append("--save_dir %s" % save_dir)
@@ -81,10 +90,8 @@ if __name__ == '__main__':
         cmd_arr.append(cur_cmd_option)
         #cmd = "%s > %s &" % (" ".join(cmd_arr), log_file)
         cmd = "%s" % (" ".join(cmd_arr))
-        #os.system(cmd)
         fout = f_dic[cuda_no]
         fout.write("%s\n" % (cmd))
         cuda_no = (cuda_no + 1) % AVAILABLE_CUDA_COUNT
     for cuda_no in f_dic:
         f_dic[cuda_no].close()
-

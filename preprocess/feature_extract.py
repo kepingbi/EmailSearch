@@ -22,8 +22,18 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
+np.random.seed(4711)  # for repeatability
 
 RATING_MAP = {"Bad":0, "Fair":1, "Good":2, "Excellent":3, "Perfect":4}
+def str2bool(val):
+    ''' parse bool type input parameters
+    '''
+    if val.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif val.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 def output_lightgbm_file(feat_file, qset, output_feat_file):
     ''' parse the initial feature file, compute the converted features
@@ -244,7 +254,7 @@ def add_column_to_file(fname, foutname, qdoc_dic, min_score, max_score):
             fout.write(line)
     fout.close()
 
-def read_context_emb(rank_file, context_emb_matrix, qcontext_dic, uq_dic):
+def read_context_emb(rank_file, context_emb_matrix, qlist, qcontext_dic, uq_dic):
     """ extract context embedding of each query
     """
     with gzip.open(rank_file, 'rt') as frank:
@@ -259,6 +269,50 @@ def read_context_emb(rank_file, context_emb_matrix, qcontext_dic, uq_dic):
             qcontext_dic[qid] = len(context_emb_matrix)
             context_emb_matrix.append(context_emb)
             uq_dic[uid].append(qid)
+            qlist.append(qid)
+
+def read_meta_info(feat_name, qid_dic):
+    line_no = 0
+    user_info = []
+    cur_qid_meta_dic = dict()
+    cur_qid_action_dic = dict()
+    with gzip.open(feat_name, "rt") as fin:
+        line = fin.readline().strip('\r\n')
+        feat_col_name = line.split('\t')
+        feat_name_dic = {feat_col_name[i]: i for i in range(len(feat_col_name))}
+        qid_column = feat_name_dic['m:QueryId']
+        max_split = qid_column + 1
+        for line in fin:
+            line_no += 1
+            if line_no % 100000 == 0:
+                print("%d lines has been parsed!" % (line_no))
+            segs = line.split('\t', maxsplit=max_split)
+            qid = int(segs[feat_name_dic['m:QueryId']])
+            if qid not in qid_dic:
+                continue
+            segs = line.split('\t')
+            item_type = int(segs[feat_name_dic['QueryLevelFeature_1997']])
+            user_type = int(segs[feat_name_dic['QueryLevelFeature_2002']])
+            q_lang_hash = int(segs[feat_name_dic['QueryLevelFeature_2001']])
+            culture_lcid = int(segs[feat_name_dic['QueryLevelFeature_1999']])
+            locale_lcid = int(segs[feat_name_dic['QueryLevelFeature_1998']])
+            rating = RATING_MAP[segs[feat_name_dic['m:Rating']]]
+            if qid not in cur_qid_meta_dic:
+                cur_qid_meta_dic[qid] = [item_type, user_type, \
+                    q_lang_hash, culture_lcid, locale_lcid]
+            if qid not in cur_qid_action_dic:
+                cur_qid_action_dic[qid] = defaultdict(int)
+            if rating > 0:
+                actions = segs[feat_name_dic['m:StrongAction']].split(';')
+                for action in actions:
+                    cur_qid_action_dic[qid][action] += 1
+    for qid in cur_qid_action_dic:
+        sorted_action = sorted(cur_qid_action_dic[qid], key=cur_qid_action_dic[qid].get, reverse=True)
+        action_type = sorted_action[0] if len(sorted_action) > 0 else "None"
+        if len(sorted_action) > 1 and sorted_action[0] == "ReadingPaneDisplayLongDwell":
+            action_type = sorted_action[1]
+        cur_qid_meta_dic[qid].append(action_type)
+    return cur_qid_meta_dic
 
 def add_context_to_file(fname, foutname, context_emb, id_dic, feat_type="QContext"):
     ''' add context emb to the feature file as additional features
@@ -305,7 +359,8 @@ def main():
         # default="/home/keping2/data/input/extract_sample0.10_hist_len11_feat_file.txt.gz")
     #parser.add_argument('--data_path', '-d', default="/home/keping2/data/input/by_time")
     parser.add_argument('--data_path', '-d', \
-        default="/home/keping2/data/input/rand_small/all_sample/by_time")
+        # default="/home/keping2/data/input/rand_small/all_sample/by_time")
+        default="/home/keping2/EmailSearch/model")
     parser.add_argument('--rank_dir', '-r', \
         default="/home/keping2/EmailSearch/model")
         #default="/home/keping2/data/working/pos_doc_context/by_users_usepopFalse_convTrue_docTrue")
@@ -319,6 +374,8 @@ def main():
         choices=["MiniBatchKMeans", "KMeans", "GaussianMixture", "AgglCluster", "DBSCAN", "FastCluster"], help='')
     parser.add_argument('--n_clusters', default=10, type=int, help='')
     parser.add_argument('--sample_size', default=10000, type=int, help='')
+    parser.add_argument("--show_tsne", type=str2bool, nargs='?', const=True, default=True,
+                        help="Analyze the clustering figure.")
 
     paras = parser.parse_args()
     print(paras)
@@ -368,28 +425,44 @@ def main():
         elif paras.option == "add_query_context":
             qcontext_dic = dict()
             uq_dic = defaultdict(list)
+            qid_list = []
             context_emb_matrix = []
-            read_context_emb(train_rank_file, context_emb_matrix, qcontext_dic, uq_dic)
-            read_context_emb(valid_rank_file, context_emb_matrix, qcontext_dic, uq_dic)
-            read_context_emb(test_rank_file, context_emb_matrix, qcontext_dic, uq_dic)
+            read_context_emb(train_rank_file, context_emb_matrix, qid_list, qcontext_dic, uq_dic)
+            read_context_emb(valid_rank_file, context_emb_matrix, qid_list, qcontext_dic, uq_dic)
+            read_context_emb(test_rank_file, context_emb_matrix, qid_list, qcontext_dic, uq_dic)
             context_emb_matrix = np.asarray(context_emb_matrix, dtype=np.float32)
+            qid_array = np.asarray(qid_list)
             print(context_emb_matrix.shape) # sample_size, hidden_emb_size(128)
             outfname = os.path.splitext(os.path.splitext(fname)[0])[0]
             if paras.do_cluster == "none":
                 qcontext_int_matrix = convert_to_int(context_emb_matrix)
                 outfname += "_qcontext_emb.txt.gz"
             else:
-                # randperm = np.random.permutation(context_emb_matrix.shape[0])
-                # context_emb_matrix = context_emb_matrix[randperm[:paras.sample_size]]
+                if paras.show_tsne:
+                    randperm = np.random.permutation(context_emb_matrix.shape[0])
+                    context_emb_matrix = context_emb_matrix[randperm[:paras.sample_size]]
+                    qid_array = qid_array[randperm[:paras.sample_size]]
+                    qdic = set(qid_array)
+                    cur_qid_meta_dic = read_meta_info(paras.feat_file, qdic)
+                    column_names = ["item_type", "user_type", "q_lang_hash", "culture_lcid", "locale_lcid", "action"]
+                    qmeta_info = [cur_qid_meta_dic[q] for q in qid_array]
+                    df = pd.DataFrame(np.asarray(qmeta_info), columns=column_names)
+                    print(len(df))
+
                 qcontext_int_matrix = cluster_context_emb(
                     context_emb_matrix, paras.n_clusters, paras.cluster_method, paras.do_cluster)
-                fname = os.path.basename(paras.data_path) + '_' + paras.cluster_method
+                print(len(qcontext_int_matrix))
+                data_version = "by_users" if "by_users" in paras.data_path else "by_time"
+                fname = data_version + '_' + paras.cluster_method
                 n_clusters = paras.n_clusters
                 if paras.cluster_method == "DBSCAN":
                     n_clusters = len(np.unique(qcontext_int_matrix))
-                # print(n_clusters)
-                # fit_tsne(context_emb_matrix, qcontext_int_matrix, \
-                #     sample_size=paras.sample_size, n_clusters=n_clusters, figname=fname)
+                if paras.show_tsne:
+                    df["cluster_id"] = qcontext_int_matrix
+                    fit_tsne(context_emb_matrix, df, figname="%s_spl%d" % (fname, paras.sample_size))
+                    if paras.sample_size < len(qcontext_dic):
+                        # do not perform adding context to feature file
+                        return
                 outfname += "_qcluster_{}.txt.gz".format(paras.do_cluster)
             out_file = os.path.join(paras.rank_dir, outfname)
             add_context_to_file(paras.feat_file, out_file, \
@@ -399,9 +472,10 @@ def main():
             # which do not update often during test time
             qcontext_dic = dict()
             uq_dic = defaultdict(list)
+            qid_list = []
             context_emb_matrix = []
-            read_context_emb(train_rank_file, context_emb_matrix, qcontext_dic, uq_dic)
-            read_context_emb(valid_rank_file, context_emb_matrix, qcontext_dic, uq_dic)
+            read_context_emb(train_rank_file, context_emb_matrix, qid_list, qcontext_dic, uq_dic)
+            read_context_emb(valid_rank_file, context_emb_matrix, qid_list, qcontext_dic, uq_dic)
             context_emb_matrix = np.asarray(context_emb_matrix, dtype=np.float32)
             ucontext_mean_emb, uid_dic = collect_ucontext_emb(
                 context_emb_matrix, qcontext_dic, uq_dic)
@@ -418,33 +492,37 @@ def main():
             add_context_to_file(paras.feat_file, out_file, \
                 ucontext_mean_emb, uid_dic, feat_type="UContext")
 
-def fit_tsne(context_matrix, cluster_id_matrix, sample_size=10000, n_clusters=10, figname=''):
-    feat_cols = ['feat'+str(i) for i in range(context_matrix.shape[1])]
-    df = pd.DataFrame(context_matrix, columns=feat_cols)
-    df['y'] = cluster_id_matrix
+def fit_tsne(context_matrix, df, figname=''):
+    # feat_cols = ['feat'+str(i) for i in range(context_matrix.shape[1])]
+    # df = pd.DataFrame(context_matrix, columns=feat_cols)
+    # df['y'] = cluster_id_matrix
     # randperm = np.random.permutation(context_matrix.shape[0])
     # #df['y'] = y
     # #df['label'] = df['y'].apply(lambda i: str(i))
     # df_subset = df.loc[randperm[:sample_size]].copy()
-    df_subset = df
-    data_subset = df_subset[feat_cols].values
+    # df_subset = df
+    # data_subset = df_subset[feat_cols].values
     
     time_start = time.time()
     tsne = TSNE(n_components=2, verbose=1, perplexity=40, n_iter=300)
-    tsne_results = tsne.fit_transform(data_subset)
+    tsne_results = tsne.fit_transform(context_matrix)
     print('t-SNE done! Time elapsed: {} seconds'.format(time.time()-time_start))
-    df_subset['tsne-2d-one'] = tsne_results[:, 0]
-    df_subset['tsne-2d-two'] = tsne_results[:, 1]
-    plt.figure(figsize=(16, 10))
-    sns.scatterplot(
-        x="tsne-2d-one", y="tsne-2d-two",
-        hue="y",
-        palette=sns.color_palette("hls", n_clusters),
-        data=df_subset,
-        legend="full",
-        alpha=0.3
-    )
-    plt.savefig("tsne_%s_spl%d_n%d.pdf" % (figname, sample_size, n_clusters))
+    df['tsne-2d-one'] = tsne_results[:, 0]
+    df['tsne-2d-two'] = tsne_results[:, 1]
+    column_names = ["cluster_id", "item_type", "user_type", \
+        "q_lang_hash", "culture_lcid", "locale_lcid", "action"]
+    for label in column_names:
+        n_colors = len(np.unique(df[label]))
+        plt.figure(figsize=(16, 10))
+        sns.scatterplot(
+            x="tsne-2d-one", y="tsne-2d-two",
+            hue=label,
+            palette=sns.color_palette("hls", n_colors),
+            data=df,
+            legend="full",
+            alpha=0.3
+        )
+        plt.savefig("tsne_figs/tsne_%s_%s%d.pdf" % (figname, label, n_colors))
 
 def cluster_context_emb(X, n_clusters, cluster_method="MiniBatchKmeans", way="hard"):
     """ cluster each context to clusters

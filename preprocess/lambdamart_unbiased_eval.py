@@ -11,6 +11,16 @@ import glob
 import numpy as np
 from collections import defaultdict
 
+def str2bool(val):
+    ''' parse bool type input parameters
+    '''
+    if val.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif val.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 LIGHTGBM = "/home/keping2/LambdaMart/LightGBM/lightgbm"
 CONF_DIR = "/home/keping2/data/working/lambdarank"
 JAR_PATH = "/home/keping2/unbiased_evaluation"
@@ -24,7 +34,6 @@ EVAL_START_ARR.append(" UnbiasedEvaluationAether")
 EVAL_START_STR = "".join(EVAL_START_ARR)
 #  "fileRelAndImpressions.txt" "fileScore1" "fileScore2" "output.txt"
 EVAL_END_STR = "1234567 10 \"1,3,5,10,100\" \"Softrank\" \"true\""
-# EVAL_END_STR = "1234567 1 \"1,3,5,10,100\" \"Softrank\" \"true\""
 
 def train_lambda_rank(rank_dir):
     """ Train and evaluate a lambda rank model
@@ -132,6 +141,8 @@ def read_doc_scores(rank_file, qdoc_dic):
                 doc_score = float(doc_score)
                 qdoc_dic[qid][int(doc_id)] = doc_score
 
+WORK_DIR = "/home/keping2/data/working/"
+CONTEXT_DIR = "%s/pos_doc_context/" % (WORK_DIR)
 RANKDIR_BM25_ERR_DIC = {"by_time": \
     "/home/keping2/data/working/BM25f_simpleError/pos_doc_context/by_time_usepopFalse_convFalse_docFalse_ff512_h8_layer2_lr0.002_ws4000_epoch10_lnorm5e-05",
                "by_users": \
@@ -140,6 +151,24 @@ RANKDIR_BASE_BM25_ERR_DIC = {"by_time": \
     "/home/keping2/data/working/BM25f_simpleError/baseline/by_time_lr0.002_ws4000_epoch10_l25e-05_qinterTrue",
                "by_users": \
     "/home/keping2/data/working/BM25f_simpleError/baseline/by_users_lr0.002_epoch10_l25e-05_qinterTrue"}
+
+RANKDIR_DIC = {"by_time": \
+    [CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue", \
+        CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse", \
+        CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse", \
+            CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse", \
+                CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqFalse"],
+               "by_users": \
+    [CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue", \
+        CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse",\
+        CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse", \
+            CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse", \
+                CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqFalse"]}
+
+RANKDIR_BASE_DIC = {"by_time": \
+    "/home/keping2/data/working/baseline/by_time_lr0.002_ws3000_epoch20_lnorm5e-05",
+               "by_users": \
+    "/home/keping2/data/working/baseline/by_users_lr0.002_ws3000_epoch20_lnorm1e-05"}
 
 
 BASELINE_SCORE_DIC = {"by_time":"/home/keping2/data/input/by_time/unbiased_eval/model_score.txt", \
@@ -153,26 +182,32 @@ def main():
     #parser.add_argument('--data_path', '-d', default="/home/keping2/data/input/by_time")
     parser.add_argument('--data_path', '-d', default="/home/keping2/data/input/rand_small/all_sample/by_time")
     parser.add_argument('--version', '-v', default="BM25Correct", choices=["BM25Correct", "BM25Error"])
-    parser.add_argument('--option', default="lambdamart", \
+    parser.add_argument('--option', '-o', default="lambdamart", \
         choices=["neural", "lambdamart"], help='')
+    parser.add_argument("--qinteract", type=str2bool, nargs='?', const=True, default=True,
+                        help="use qinteract==True or False for the baseline version.")
 
     paras = parser.parse_args()
     if paras.option == "neural":
         base_dic = BASELINE_SCORE_DIC if paras.version == "BM25Correct" else BASELINE_SCORE_BM25_ERR_DIC
-        neural_base_dic = RANKDIR_BASE_BM25_ERR_DIC # TODO: add others later
-        neural_context_dic = RANKDIR_BM25_ERR_DIC
+        neural_base_dic = RANKDIR_BASE_DIC if paras.version == "BM25Correct" else RANKDIR_BASE_BM25_ERR_DIC
+        neural_context_dic = RANKDIR_DIC if paras.version == "BM25Correct" else RANKDIR_BM25_ERR_DIC
         for exp in ["by_time", "by_users"]:
             fbaseline_score = base_dic[exp]
             rel_impression_file = fbaseline_score.replace("model_score", "rel_impress")
             neural_base_path = neural_base_dic[exp]
-            neural_context_path = neural_context_dic[exp]
-            eval_file = "%s/neural_context_vs_baseline.txt" % (neural_context_path)
-            base_output = eval_neural_model_output(neural_base_path, fbaseline_score)
-            model_output = eval_neural_model_output(neural_context_path, fbaseline_score)
-            cmd_arr = [EVAL_START_STR, rel_impression_file, base_output, model_output, eval_file, EVAL_END_STR]
-            cmd = " ".join(cmd_arr)
-            print(cmd)
-            os.system(cmd)
+            if not paras.qinteract:
+                neural_base_path += "_qinterFalse"
+            # neural_context_path = neural_context_dic[exp]
+            for neural_context_path in neural_context_dic[exp]:
+                print(neural_context_path)
+                eval_file = "%s/neural_context_vs_baseline_qinter%s.txt" % (neural_context_path, paras.qinteract)
+                base_output = eval_neural_model_output(neural_base_path, fbaseline_score)
+                model_output = eval_neural_model_output(neural_context_path, fbaseline_score)
+                cmd_arr = [EVAL_START_STR, rel_impression_file, base_output, model_output, eval_file, EVAL_END_STR]
+                cmd = " ".join(cmd_arr)
+                print(cmd)
+                os.system(cmd)
         return
     base_dic = BASELINE_SCORE_DIC if paras.version == "BM25Correct" else BASELINE_SCORE_BM25_ERR_DIC
     if "by_time" in paras.data_path:

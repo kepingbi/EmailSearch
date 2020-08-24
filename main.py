@@ -84,8 +84,18 @@ def parse_args():
                         help="Use the position doc occur in the past or not.")
     parser.add_argument("--conv_occur", type=str2bool, nargs='?', const=True, default=False,
                         help="Use the position the same thread occur in the past or not.")
+    parser.add_argument("--rand_prev", type=str2bool, nargs='?', const=True, default=False,
+                        help="Use random previous queries as context.")
     parser.add_argument("--qinteract", type=str2bool, nargs='?', const=True, default=True,
                         help="Use query interact with all features or not for the baseline.")
+    parser.add_argument("--qfeat", type=str2bool, nargs='?', const=True, default=True,
+                        help="Whether to include query-level features when encoding context.")
+    parser.add_argument("--dfeat", type=str2bool, nargs='?', const=True, default=True,
+                        help="Whether to include document-level features when encoding context.")
+    parser.add_argument("--qdfeat", type=str2bool, nargs='?', const=True, default=True,
+                        help="Whether to include q-d-matching features when encoding context.")
+    parser.add_argument("--do_curq", type=str2bool, nargs='?', const=True, default=True,
+                        help="Whether to include current query features when encoding context.")
     # parser.add_argument("--doc_occur", type=str, choices=["pos", "bool"],
     #                     help="Whether docid occur in the history. (positional or boolean)")
     # parser.add_argument("--conv_occur", type=str, choices=["pos", "bool"],
@@ -215,9 +225,9 @@ def get_doc_scores(args):
     trainer = Trainer(args, best_model, None)
     rankfname = args.rankfname
     coll_context_emb = False
-    if args.model_name == "pos_doc_context":
-        rankfname = "test.context.best_model.ranklist"
-        coll_context_emb = True
+    # if args.model_name == "pos_doc_context":
+    rankfname = "test.context.best_model.ranklist"
+    coll_context_emb = True
     trainer.test(args, global_data, "test", \
         rankfname, coll_context_emb=coll_context_emb)
     trainer.test(args, global_data, "valid", \
@@ -226,6 +236,7 @@ def get_doc_scores(args):
         rankfname.replace("test", "train"), coll_context_emb=coll_context_emb)
 
 def main(args):
+    assert int(args.qfeat) + int(args.dfeat) + int(args.qdfeat) > 0
     if not os.path.isdir(args.save_dir):
         os.makedirs(args.save_dir)
     init_logger(os.path.join(args.save_dir, args.log_file))

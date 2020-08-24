@@ -76,7 +76,8 @@ class ContextEmailRanker(BaseEmailRanker):
                 + self.additional_dim
             self.ddiscrete_W1 = nn.Linear(self.discrete_dfeat_hidden_size, self.embedding_size//2)
         #self.all_feat_hidden_size = 3 * self.embedding_size
-
+        if not self.args.do_curq:
+            self.end_cls_emb = nn.Parameter(torch.rand(1, self.embedding_size), requires_grad=True)
         self.context_q_batch_norm = nn.BatchNorm1d(self.args.prev_q_limit)
         self.context_d_batch_norm = nn.BatchNorm1d(self.args.prev_q_limit)
         self.context_qd_batch_norm = nn.BatchNorm1d(self.args.prev_q_limit)
@@ -235,15 +236,23 @@ class ContextEmailRanker(BaseEmailRanker):
         context_doc_qdcont_hidden = self.context_qd_batch_norm(context_doc_qdcont_hidden)
 
         aggr_context_emb = self.self_attn_weighted_avg(
-            context_doc_q_hidden, context_doc_d_hidden, context_doc_qdcont_hidden)
+            context_doc_q_hidden, context_doc_d_hidden, \
+                context_doc_qdcont_hidden, is_candidate=False)
         aggr_context_emb = self.context_attn_batch_norm(aggr_context_emb)
-        candi_doc_q_hidden = candi_doc_q_hidden[:, 0, :].unsqueeze(1) # batch_size,1,embedding_size
-        context_seq_emb = torch.cat([aggr_context_emb, candi_doc_q_hidden], dim=1)
+        if self.args.do_curq:
+            last_hidden = candi_doc_q_hidden[:, 0, :].unsqueeze(1)
+            # batch_size,1,embedding_size
+        else:
+            last_hidden = self.end_cls_emb.unsqueeze(0).expand(batch_size, -1, -1)
+
+        context_seq_emb = torch.cat([aggr_context_emb, last_hidden], dim=1)
         # batch_size, prev_q_limit+1, embedding_size
         context_q_mask = context_qidxs.ne(0) # query pad id
         context_seq_mask = torch.cat(
             [context_q_mask, context_q_mask.new_ones(batch_size, 1)], dim=-1)
-        context_overall_emb = self.transformer_encoder(context_seq_emb, context_seq_mask)
+        context_overall_emb = self.transformer_encoder(
+            context_seq_emb, context_seq_mask, self.args.use_pos_emb)
+        # the embedding corresponding to the last position
         expanded_context_overall_emb = context_overall_emb.unsqueeze(1).expand_as(aggr_candi_emb)
         # batch_size, candi_count, embedding_size
         # candidate score: batch_size, candi_count
