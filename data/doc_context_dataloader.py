@@ -169,11 +169,14 @@ class DocContextDataloader(DataLoader):
             uid, idx = self.personal_data.query_info_dic[qid][-1]
             #qidx, search_time
             #position of qid in the sequence of queries the user issued.
-            all_prev_qidxs = [qidx for qidx, _ in self.personal_data.u_queries_dic[uid][:idx]]
+            all_prev_qidxs = self.personal_data.u_queries_dic[uid][:idx]
             if self.args.rand_prev:
-                prev_qidxs = random.sample(all_prev_qidxs, self.args.prev_q_limit)
+                sample_count = min(len(all_prev_qidxs), self.args.prev_q_limit)
+                prev_qidxs = random.sample(all_prev_qidxs, sample_count)
+                prev_qidxs.sort(key=lambda x: x[1])
             else:
                 prev_qidxs = all_prev_qidxs[-self.args.prev_q_limit:]
+            prev_qidxs = [qidx for qidx, _ in prev_qidxs]
             # prev_qidxs = [qidx for qidx, _ in \
             #     self.personal_data.u_queries_dic[uid][:idx][-self.args.prev_q_limit:]]
             batch_context_qidxs.append(prev_qidxs)

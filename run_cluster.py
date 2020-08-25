@@ -39,17 +39,49 @@ START_NO = 0
 para_names = ["data_path", "option", "do_cluster", "cluster_method", "n_clusters"]
 short_names = ["", "", "", "", "n_clusters"]
 paras = [
-        ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 0),
-        ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 1),
-        ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 2),
+        ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 3),
+        ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 4),
 
-        ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 0),
-        ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 1),
-        ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 2),
+        ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 3),
+        ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 4),
 
-        ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 0),
-        ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 1),
-        ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 2),
+        ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 3),
+        ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 4),
+
+
+        ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 3),
+        ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 4),
+
+        ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 3),
+        ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 4),
+
+        ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 3),
+        ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 4),
+        
+        ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 0),
+        ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 1),
+        ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 2),
+
+        ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 0),
+        ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 1),
+        ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 2),
+
+        ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 0),
+        ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 1),
+        ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 2),
+
+
+        # ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 0),
+        # ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 1),
+        # ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 2),
+
+        # ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 0),
+        # ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 1),
+        # ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 2),
+
+        # ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 0),
+        # ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 1),
+        # ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 2),
 
         # ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10),
         # ("by_users", "add_query_context", "hard", "AgglCluster", 20),
@@ -146,5 +178,4 @@ if __name__ == '__main__':
             rank_dir = "%s/%s" % (cur_model_dir, run_name)
             cmd_arr.append("--data_path %s" % (rank_dir))
             cmd = "%s" % (" ".join(cmd_arr))
-            #fout.write("%s & \n" % (cmd))
             fout.write("%s\n" % (cmd))

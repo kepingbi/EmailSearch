@@ -9,19 +9,29 @@ DATA_PATH = "%s" % INPUT_DIR # hist_len
 
 script_path = "python main.py"
 model_name = "pos_doc_context"
-AVAILABLE_CUDA_COUNT = 2
-START_NO = 2
+AVAILABLE_CUDA_COUNT = 3
+START_NO = 1
 
 #para_names = ["data_path", "use_popularity", "conv_occur", "doc_occur", \
 para_names = ["data_path", "embedding_size", \
         "ff_size", "heads", "inter_layers", "lr", "warmup_steps", \
         "max_train_epoch", "l2_lambda", "prev_q_limit", "use_pos_emb", \
-            "qfeat", "dfeat", "qdfeat", "do_curq"]
+            "qfeat", "dfeat", "qdfeat", "do_curq", "rand_prev"]
 short_names = ["", "embsize", "ff", "h", "layer", "lr", \
-        "ws", "epoch", "lnorm", "prevq", "pos", "q", "d", "qd", "curq"]
+        "ws", "epoch", "lnorm", "prevq", "pos", "q", "d", "qd", "curq", "rndprev"]
 paras = [
-        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, True, True, True, True),
-        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, True, True, True, False),
+        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, False, True, True, True, True, True),
+        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 5, True, True, True, True, True, True),
+        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 15, True, True, True, True, True, True),
+        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 20, True, True, True, True, True, True),
+
+        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, False, True, True, True, True, True),
+        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 5, True, True, True, True, True, True),
+        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 15, True, True, True, True, True, True),
+        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 20, True, True, True, True, True, True),
+
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, True, True, True, True),
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, True, True, True, False),
         # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, False, False, True, False),
         # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, False, True, False, False),
         # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, False, True, True, False),
@@ -31,8 +41,8 @@ paras = [
         # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 15, True, True, True, True, True),
         # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 20, True, True, True, True, True),
 
-        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, True),
-        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, False),
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, True),
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, False),
         # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, False, False, True, False),
         # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, False, True, False, False),
         # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, False, True, True, False),
@@ -112,7 +122,7 @@ if __name__ == '__main__':
         cmd_arr.append(script_path)
         cmd_arr.append("--hist_len %s" % hist_len) # important
         cmd_arr.append("--model_name %s" % model_name)
-        cmd_arr.append("--mode test") # TODO: comment this line for training
+        # cmd_arr.append("--mode test") # TODO: comment this line for training
         cmd_arr.append("--data_dir %s/%s" % (DATA_PATH, para[0]))
         cmd_arr.append("--input_dir %s" % (INPUT_DIR))
         #cmd_arr.append("--eval_train") # evaluate performance on training set after each epoch

@@ -10,16 +10,16 @@ DATA_PATH = "%s" % INPUT_DIR # hist_len
 script_path = "python main.py"
 model_name = "baseline"
 AVAILABLE_CUDA_COUNT = 1
-START_NO = 3
+START_NO = 0
 
-para_names = ["data_path", "lr", "warmup_steps", "max_train_epoch", "l2_lambda"] #, "qinteract"]
-short_names = ["", "lr", "ws", "epoch", "lnorm"] #, "qinter"]
+para_names = ["data_path", "lr", "warmup_steps", "max_train_epoch", "l2_lambda", "qinteract"]
+short_names = ["", "lr", "ws", "epoch", "lnorm", "qinter"]
 paras = [
-        ["by_users", 0.002, 3000, 20, 0.00001],
-        ["by_time", 0.002, 3000, 20, 0.00005],
+        # ["by_users", 0.002, 3000, 20, 0.00001],
+        # ["by_time", 0.002, 3000, 20, 0.00005],
 
-        # ["by_time", 0.002, 3000, 20, 0.00005, False],
-        # ["by_users", 0.002, 3000, 20, 0.00001, False],
+        ["by_time", 0.002, 3000, 20, 0.00005, False],
+        ["by_users", 0.002, 3000, 20, 0.00001, False],
 
         # ["by_time", 0.002, 2000, 10, 0],
         # ["by_users", 0.002, 3000, 10, 0],
