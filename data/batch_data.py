@@ -7,6 +7,7 @@ class DocContextBatch():
     ''' Contextual positive documents and queries.
     '''
     def __init__(self, batch_qids, batch_user_idxs, candi_doc_idxs, candi_doc_ratings,
+                 candi_doc_rel_pos, candi_doc_time_pos,
                  candi_doc_qcont_features, candi_doc_qdiscrete_features,
                  candi_doc_dcont_features, candi_doc_ddiscrete_features,
                  candi_doc_qdcont_features, candi_doc_popularity,
@@ -20,6 +21,8 @@ class DocContextBatch():
         self.user_idxs = batch_user_idxs
         self.candi_doc_idxs = candi_doc_idxs
         self.candi_doc_ratings = candi_doc_ratings
+        self.candi_doc_rel_pos = candi_doc_rel_pos
+        self.candi_doc_time_pos = candi_doc_time_pos
         self.candi_doc_qcont_features = candi_doc_qcont_features
         self.candi_doc_qdiscrete_features = candi_doc_qdiscrete_features
         self.candi_doc_dcont_features = candi_doc_dcont_features
@@ -45,6 +48,8 @@ class DocContextBatch():
         self.user_idxs = torch.tensor(self.user_idxs)
         self.candi_doc_idxs = torch.tensor(self.candi_doc_idxs)
         self.candi_doc_ratings = torch.tensor(self.candi_doc_ratings)
+        self.candi_doc_rel_pos = torch.tensor(self.candi_doc_rel_pos)
+        self.candi_doc_time_pos = torch.tensor(self.candi_doc_time_pos)
         self.candi_doc_qcont_features = torch.tensor(self.candi_doc_qcont_features)
         self.candi_doc_qdiscrete_features = torch.tensor(self.candi_doc_qdiscrete_features)
         self.candi_doc_dcont_features = torch.tensor(self.candi_doc_dcont_features)
@@ -70,6 +75,8 @@ class DocContextBatch():
             # query and user idxs not used during training or inference
             candi_doc_idxs = self.candi_doc_idxs.to(device)
             candi_doc_ratings = self.candi_doc_ratings.to(device)
+            candi_doc_rel_pos = self.candi_doc_rel_pos.to(device)
+            candi_doc_time_pos = self.candi_doc_time_pos.to(device)
             candi_doc_qcont_features = self.candi_doc_qcont_features.to(device).float()
             candi_doc_qdiscrete_features = self.candi_doc_qdiscrete_features.to(device)
             candi_doc_dcont_features = self.candi_doc_dcont_features.to(device).float()
@@ -90,6 +97,7 @@ class DocContextBatch():
             return self.__class__(
                 self.query_idxs, self.user_idxs,
                 candi_doc_idxs, candi_doc_ratings,
+                candi_doc_rel_pos, candi_doc_time_pos,
                 candi_doc_qcont_features, candi_doc_qdiscrete_features,
                 candi_doc_dcont_features, candi_doc_ddiscrete_features,
                 candi_doc_qdcont_features, candi_doc_popularity,
@@ -104,6 +112,7 @@ class DocBaselineBatch(object):
     ''' Contextual positive documents and queries.
     '''
     def __init__(self, batch_qids, batch_user_idxs, candi_doc_idxs, candi_doc_ratings,
+                 candi_doc_rel_pos, candi_doc_time_pos,
                  candi_doc_qcont_features, candi_doc_qdiscrete_features,
                  candi_doc_dcont_features, candi_doc_ddiscrete_features,
                  candi_doc_qdcont_features,
@@ -112,6 +121,8 @@ class DocBaselineBatch(object):
         self.user_idxs = batch_user_idxs
         self.candi_doc_idxs = candi_doc_idxs
         self.candi_doc_ratings = candi_doc_ratings
+        self.candi_doc_rel_pos = candi_doc_rel_pos
+        self.candi_doc_time_pos = candi_doc_time_pos
         self.candi_doc_qcont_features = candi_doc_qcont_features
         self.candi_doc_qdiscrete_features = candi_doc_qdiscrete_features
         self.candi_doc_dcont_features = candi_doc_dcont_features
@@ -126,6 +137,8 @@ class DocBaselineBatch(object):
         self.user_idxs = torch.tensor(self.user_idxs)
         self.candi_doc_idxs = torch.tensor(self.candi_doc_idxs)
         self.candi_doc_ratings = torch.tensor(self.candi_doc_ratings)
+        self.candi_doc_rel_pos = torch.tensor(self.candi_doc_rel_pos)
+        self.candi_doc_time_pos = torch.tensor(self.candi_doc_time_pos)
         self.candi_doc_qcont_features = torch.tensor(self.candi_doc_qcont_features).float()
         self.candi_doc_qdiscrete_features = torch.tensor(self.candi_doc_qdiscrete_features)
         self.candi_doc_dcont_features = torch.tensor(self.candi_doc_dcont_features).float()
@@ -138,6 +151,8 @@ class DocBaselineBatch(object):
         else:
             candi_doc_idxs = self.candi_doc_idxs.to(device)
             candi_doc_ratings = self.candi_doc_ratings.to(device)
+            candi_doc_rel_pos = self.candi_doc_rel_pos.to(device)
+            candi_doc_time_pos = self.candi_doc_time_pos.to(device)
             candi_doc_qcont_features = self.candi_doc_qcont_features.to(device)
             candi_doc_qdiscrete_features = self.candi_doc_qdiscrete_features.to(device)
             candi_doc_dcont_features = self.candi_doc_dcont_features.to(device)
@@ -147,6 +162,7 @@ class DocBaselineBatch(object):
             return self.__class__(
                 self.query_idxs, self.user_idxs,
                 candi_doc_idxs, candi_doc_ratings,
+                candi_doc_rel_pos, candi_doc_time_pos,
                 candi_doc_qcont_features, candi_doc_qdiscrete_features,
                 candi_doc_dcont_features, candi_doc_ddiscrete_features,
                 candi_doc_qdcont_features, to_tensor=False)

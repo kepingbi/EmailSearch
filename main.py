@@ -86,6 +86,10 @@ def parse_args():
                         help="Use the position the same thread occur in the past or not.")
     parser.add_argument("--rand_prev", type=str2bool, nargs='?', const=True, default=False,
                         help="Use random previous queries as context.")
+    parser.add_argument("--unbiased_train", type=str2bool, nargs='?', const=True, default=False,
+                        help="Do unbiased learning instead of using biased click data directly.")
+    parser.add_argument("--show_propensity", "-sp", type=str2bool, nargs='?', const=True, default=False,
+                        help="Use documents' recent popularity as representation or not.")
     parser.add_argument("--qinteract", type=str2bool, nargs='?', const=True, default=True,
                         help="Use query interact with all features or not for the baseline.")
     parser.add_argument("--qfeat", type=str2bool, nargs='?', const=True, default=True,

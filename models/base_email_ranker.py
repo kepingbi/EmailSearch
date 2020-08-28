@@ -6,6 +6,7 @@ import torch.nn as nn
 from models.group_encoder import AVGEncoder, FSEncoder, RNNEncoder
 from models.transformer import TransformerEncoder
 from models.optimizers import Optimizer
+from models.examination_model import ExaminationModel
 from others.logging import logger
 from others.util import pad
 
@@ -22,6 +23,7 @@ class BaseEmailRanker(nn.Module):
 
     g_qdiscrete_feat_idx = {y:x for x, y in enumerate(g_qdiscrete_features)}
     g_doc_discrete_feat_idx = {y:x for x, y in enumerate(g_doc_discrete_features)}
+    g_max_weight = 15.
     # the following should be the same with PersonalSearchData
     # g_operators_count = 10 # set to 10, otherwise cut
     # g_tolist_size = 10 # set to 10, otherwise cut
@@ -154,7 +156,8 @@ class BaseEmailRanker(nn.Module):
             self.final_layer = nn.Linear(self.embedding_size//2, 1)
         self.dropout_layer = nn.Dropout(p=args.dropout)
         self.attn_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
-
+        if self.args.unbiased_train:
+            self.exam_model = ExaminationModel(self.embedding_size, self.emb_dropout)
         #for each q,u,i
         #Q, previous purchases of u, current available reviews for i, padding value
         #self.logsoftmax = torch.nn.LogSoftmax(dim = -1)
@@ -174,6 +177,22 @@ class BaseEmailRanker(nn.Module):
         # batch_size, candi_count
         doc_scores, context_emb = self.compute_candi_doc_scores(batch_data)
         # mask already applied when computing the scores.
+        if self.args.unbiased_train and self.args.show_propensity:
+            relevance_pos = batch_data.candi_doc_rel_pos
+            datetime_pos = batch_data.candi_doc_time_pos
+            exam_output = self.exam_model(relevance_pos, datetime_pos)
+            detached_exam_output = torch.softmax(exam_output.detach().clone(), dim=-1)
+            norm_exam_output = detached_exam_output[:, 0].reshape(-1, 1) / detached_exam_output
+            norm_exam_output = torch.clamp(\
+                norm_exam_output, min=1./self.g_max_weight, max=self.g_max_weight)
+            relevance_pos = relevance_pos.cpu().tolist()
+            datetime_pos = datetime_pos.cpu().tolist()
+            norm_exam_output = norm_exam_output.cpu().tolist()
+            for rel, datetime, exam in zip(relevance_pos, datetime_pos, norm_exam_output):
+                for idx, doc_rel in enumerate(rel):
+                    print("{}_{}:{}".format(doc_rel, datetime[idx], exam[idx]))
+
+            # should be larger than 1
         return doc_scores, context_emb
 
     def forward(self, batch_data):
@@ -183,11 +202,29 @@ class BaseEmailRanker(nn.Module):
 
         # batch_size, candi_count
         doc_scores, _ = self.compute_candi_doc_scores(batch_data)
-        loss = -self.logsoftmax(doc_scores) * candi_doc_ratings.float()
-        # loss = -self.logsoftmax(doc_scores) * (candi_doc_ratings.float().exp()-1)
-        loss = loss * candi_doc_mask.float()
-        loss = loss.sum(-1).mean()
-        return loss
+        if self.args.unbiased_train:
+            relevance_pos = batch_data.candi_doc_rel_pos
+            datetime_pos = batch_data.candi_doc_time_pos
+            exam_output = self.exam_model(relevance_pos, datetime_pos)
+            detached_exam_output = torch.softmax(exam_output.detach().clone(), dim=-1)
+            norm_exam_output = detached_exam_output[:, 0].reshape(-1, 1) / detached_exam_output
+            norm_exam_output = torch.clamp(\
+                norm_exam_output, min=1./self.g_max_weight, max=self.g_max_weight)
+            # should be larger than 1
+            rel_loss = -self.logsoftmax(doc_scores) * candi_doc_ratings.float() * norm_exam_output
+            detached_doc_scores = torch.softmax(doc_scores.detach().clone(), dim=-1)
+            norm_doc_scores = detached_doc_scores[:, 0].reshape(-1, 1) / detached_doc_scores
+            norm_doc_scores = torch.clamp(\
+                norm_doc_scores, min=1./self.g_max_weight, max=self.g_max_weight)
+            exam_loss = -self.logsoftmax(exam_output) * candi_doc_ratings.float() * norm_doc_scores
+            exam_loss = (exam_loss * candi_doc_mask.float()).sum(-1).mean()
+        else:
+            rel_loss = -self.logsoftmax(doc_scores) * candi_doc_ratings.float()
+            # loss = -self.logsoftmax(doc_scores) * (candi_doc_ratings.float().exp()-1)
+            exam_loss = None
+        rel_loss = rel_loss * candi_doc_mask.float()
+        rel_loss = rel_loss.sum(-1).mean()
+        return rel_loss, exam_loss
 
     def compute_candi_doc_scores(self, batch_data):
         """ compute the scores of candidate documents in the batch

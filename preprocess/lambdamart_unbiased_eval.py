@@ -55,10 +55,10 @@ def train_lambda_rank(rank_dir):
     os.system(test_cmd)
     return score_path
 
-def unbiased_pair_eval(rank_dir, score_path, base_file=""):
+def unbiased_pair_eval(rank_dir, score_path, base_file="", evalfname="eval_metrics.txt"):
     # Rating QueryId DocId RelevancePosition DateTimePosition Recency
     eval_dir = "%s/unbiased_eval" % rank_dir
-    eval_file = "%s/eval_metrics.txt" % eval_dir
+    eval_file = "%s/%s" % (eval_dir, evalfname)
     # eval_file = "%s/eval_metrics_v65.txt" % eval_dir
     os.system("mkdir -p %s" % eval_dir)
     test_file = "%s/test_feat.tsv" % rank_dir
@@ -143,6 +143,8 @@ def read_doc_scores(rank_file, qdoc_dic):
 
 WORK_DIR = "/home/keping2/data/working/"
 CONTEXT_DIR = "%s/pos_doc_context/" % (WORK_DIR)
+BASELINE_DIR = "%s/baseline/" % (WORK_DIR)
+
 RANKDIR_BM25_ERR_DIC = {"by_time": \
     "/home/keping2/data/working/BM25f_simpleError/pos_doc_context/by_time_usepopFalse_convFalse_docFalse_ff512_h8_layer2_lr0.002_ws4000_epoch10_lnorm5e-05",
                "by_users": \
@@ -153,26 +155,37 @@ RANKDIR_BASE_BM25_ERR_DIC = {"by_time": \
     "/home/keping2/data/working/BM25f_simpleError/baseline/by_users_lr0.002_epoch10_l25e-05_qinterTrue"}
 
 RANKDIR_DIC = {"by_time": \
-    [CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue", \
+    [
+    CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue_rndprevFalse_unbiasTrue", 
+     CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue", \
         CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse", \
         CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse", \
             CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse", \
                 CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqFalse"],
                "by_users": \
-    [CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue", \
+    [
+    CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue_rndprevFalse_unbiasTrue",
+    CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue", \
         CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse",\
         CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse", \
             CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse", \
                 CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqFalse"]}
 
 RANKDIR_BASE_DIC = {"by_time": \
-    "/home/keping2/data/working/baseline/by_time_lr0.002_ws3000_epoch20_lnorm5e-05",
+    # "/home/keping2/data/working/baseline/by_time_lr0.002_ws3000_epoch20_lnorm5e-05_qinterFalse",
+    # "/home/keping2/data/working/baseline/by_time_lr0.002_ws3000_epoch10_lnorm5e-05_qinterFalse_unbiasTrue",
+    CONTEXT_DIR + "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue", \
                "by_users": \
-    "/home/keping2/data/working/baseline/by_users_lr0.002_ws3000_epoch20_lnorm1e-05"}
+    CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue", \
+    # "/home/keping2/data/working/baseline/by_users_lr0.002_ws3000_epoch10_lnorm1e-05_qinterFalse_unbiasTrue"
+    }
 
 
 BASELINE_SCORE_DIC = {"by_time":"/home/keping2/data/input/by_time/unbiased_eval/model_score.txt", \
     "by_users":"/home/keping2/data/input/by_users/unbiased_eval/model_score.txt"}
+
+BASELINE_LN_SCORE_DIC = {"by_time":"/home/keping2/data/working/baseline/by_time_lr0.002_ws3000_epoch10_lnorm5e-05_qinterFalse_unbiasTrue/by_time_add_doc_score_none_none_n_clusters0/unbiased_eval/model_score.txt", \
+    "by_users":"/home/keping2/data/working/baseline/by_users_lr0.002_ws3000_epoch10_lnorm1e-05_qinterFalse_unbiasTrue/by_users_add_doc_score_none_none_n_clusters0/unbiased_eval/model_score.txt"}
 
 BASELINE_SCORE_BM25_ERR_DIC = {\
     "by_time":"/home/keping2/data/input/by_time/BM25f_simple_error/unbiased_eval/model_score.txt", \
@@ -180,10 +193,11 @@ BASELINE_SCORE_BM25_ERR_DIC = {\
 def main():
     parser = argparse.ArgumentParser()
     #parser.add_argument('--data_path', '-d', default="/home/keping2/data/input/by_time")
+    parser.add_argument('--base_path', '-b', default="/home/keping2/data/input/rand_small/all_sample/by_time")
     parser.add_argument('--data_path', '-d', default="/home/keping2/data/input/rand_small/all_sample/by_time")
     parser.add_argument('--version', '-v', default="BM25Correct", choices=["BM25Correct", "BM25Error"])
     parser.add_argument('--option', '-o', default="lambdamart", \
-        choices=["neural", "lambdamart"], help='')
+        choices=["neural", "lambdamart", "eval"], help='')
     parser.add_argument("--qinteract", type=str2bool, nargs='?', const=True, default=True,
                         help="use qinteract==True or False for the baseline version.")
 
@@ -199,25 +213,32 @@ def main():
             if not paras.qinteract:
                 neural_base_path += "_qinterFalse"
             # neural_context_path = neural_context_dic[exp]
-            for neural_context_path in neural_context_dic[exp]:
+            for neural_context_path in neural_context_dic[exp][0:1]:
                 print(neural_context_path)
-                eval_file = "%s/neural_context_vs_baseline_qinter%s.txt" % (neural_context_path, paras.qinteract)
+                # eval_file = "%s/neural_context_vs_baseline_qinter%s.txt" % (neural_context_path, paras.qinteract)
+                eval_file = "%s/neural_context_unbiased_vs_baseline.txt" % (neural_context_path)
                 base_output = eval_neural_model_output(neural_base_path, fbaseline_score)
                 model_output = eval_neural_model_output(neural_context_path, fbaseline_score)
                 cmd_arr = [EVAL_START_STR, rel_impression_file, base_output, model_output, eval_file, EVAL_END_STR]
                 cmd = " ".join(cmd_arr)
                 print(cmd)
                 os.system(cmd)
-        return
-    base_dic = BASELINE_SCORE_DIC if paras.version == "BM25Correct" else BASELINE_SCORE_BM25_ERR_DIC
-    if "by_time" in paras.data_path:
-        fbaseline_score = base_dic["by_time"]
+    elif paras.option == "lambdamart":
+        base_dic = BASELINE_SCORE_DIC if paras.version == "BM25Correct" else BASELINE_SCORE_BM25_ERR_DIC
+        if "by_time" in paras.data_path:
+            fbaseline_score = base_dic["by_time"]
+        else:
+            fbaseline_score = base_dic["by_users"]
+        score_path = train_lambda_rank(paras.data_path)
+        score_path = "%s/LightGBM_predict_result.txt" % paras.data_path
+        unbiased_pair_eval(paras.data_path, score_path, fbaseline_score)
+        # unbiased_pair_eval(paras.data_path, score_path)
     else:
-        fbaseline_score = base_dic["by_users"]
-    score_path = train_lambda_rank(paras.data_path)
-    score_path = "%s/LightGBM_predict_result.txt" % paras.data_path
-    unbiased_pair_eval(paras.data_path, score_path, fbaseline_score)
-    # unbiased_pair_eval(paras.data_path, score_path)
-
+        base_dic = BASELINE_LN_SCORE_DIC
+        fbaseline_score = base_dic["by_time"] if "by_time" in paras.data_path else base_dic["by_users"]
+        score_path = "%s/LightGBM_predict_result.txt" % paras.data_path
+        # fbaseline_score = "%s//unbiased_eval/model_score.txt" % paras.base_path
+        unbiased_pair_eval(paras.data_path, score_path, fbaseline_score, "eval_vs_lambdamart_with_neural_base.txt")
+        
 if __name__ == '__main__':
     main()

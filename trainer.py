@@ -48,7 +48,7 @@ class Trainer(object):
         valid_dataset = self.ExpDataset(args, global_data, "valid")
         if self.args.eval_train:
             train_eval_dataset = self.ExpDataset(args, global_data, "train", for_test=True)
-        step_time, loss = 0., 0.
+        step_time, rel_loss, exam_loss = 0., 0., 0.
         get_batch_time = 0.0
         start_time = time.time()
         current_step = 0
@@ -66,27 +66,37 @@ class Trainer(object):
             time_flag = time.time()
             for batch_data in pbar:
                 batch_data = batch_data.to(args.device)
+                if len(batch_data.query_idxs) == 0:
+                    # if batch is empty
+                    continue
                 get_batch_time += time.time() - time_flag
                 time_flag = time.time()
-                step_loss = self.model(batch_data)
+                step_rel_loss, step_exam_loss = self.model(batch_data)
                 #self.optim.optimizer.zero_grad()
                 self.model.zero_grad()
-                step_loss.backward()
+                step_rel_loss.backward()
+                if step_exam_loss is not None:
+                    step_exam_loss.backward()
+                    step_exam_loss = step_exam_loss.item()
+                else:
+                    step_exam_loss = 0.
                 self.optim.step()
-                step_loss = step_loss.item()
-                pbar.set_postfix(step_loss=step_loss, lr=self.optim.learning_rate)
-                loss += step_loss / args.steps_per_checkpoint #convert an tensor with dim 0 to value
+                step_rel_loss = step_rel_loss.item()
+                pbar.set_postfix(step_rel_loss=step_rel_loss, \
+                    step_exam_loss=step_exam_loss, lr=self.optim.learning_rate)
+                rel_loss += step_rel_loss / args.steps_per_checkpoint
+                exam_loss += step_exam_loss / args.steps_per_checkpoint
                 current_step += 1
                 step_time += time.time() - time_flag
 
                 # Once in a while, we print statistics.
                 if current_step % args.steps_per_checkpoint == 0:
                     logger.info(
-                        "\n Epoch %d lr = %5.6f loss = %6.2f time %.2f \
+                        "\n Epoch %d lr = %5.6f rel_loss = %6.2f exam_loss = %6.2f time %.2f \
                         prepare_time %.2f step_time %.2f\n" %
-                        (current_epoch, self.optim.learning_rate, loss,
+                        (current_epoch, self.optim.learning_rate, rel_loss, exam_loss,
                          time.time()-start_time, get_batch_time, step_time))#, end=""
-                    step_time, get_batch_time, loss = 0., 0., 0.
+                    step_time, get_batch_time, rel_loss, exam_loss = 0., 0., 0., 0.
                     sys.stdout.flush()
                     start_time = time.time()
             checkpoint_path = os.path.join(model_dir, 'model_epoch_%d.ckpt' % current_epoch)

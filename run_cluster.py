@@ -12,18 +12,29 @@ RANKDIR_BM25Error_DIC = {"by_time": \
                "by_users": \
     "by_users_usepopFalse_convFalse_docFalse_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05"}
 RANKDIR_DIC = {"by_time": \
-    ["by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse", \
-        "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse", \
-            "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse", \
-                "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqFalse", \
-                "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue"
+    [
+        "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue_rndprevFalse_unbiasTrue",
+        "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse_rndprevFalse_unbiasTrue",
+        "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse_rndprevFalse_unbiasTrue",
+        # "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse", \
+        # "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse", \
+        #     "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse", \
+        #         "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqFalse", \
+        #         "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue",
+        #         "by_time_lr0.002_ws3000_epoch10_lnorm5e-05_qinterFalse_unbiasTrue",
                 ],
+
                "by_users": \
-    ["by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse",\
-        "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse", \
-            "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse", \
-                "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqFalse", \
-                "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue", \
+    [
+        "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue_rndprevFalse_unbiasTrue",
+        "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse_rndprevFalse_unbiasTrue",
+        "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse_rndprevFalse_unbiasTrue",
+        # "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse",\
+        # "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse", \
+        #     "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse", \
+        #         "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqFalse", \
+        #         "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue", \
+        #         "by_users_lr0.002_ws3000_epoch10_lnorm1e-05_qinterFalse_unbiasTrue",
                     ]}
 
 script_path = "python preprocess/feature_extract.py"
@@ -32,6 +43,7 @@ lambdamart_path = "python preprocess/lambdamart_unbiased_eval.py"
 
 MODEL_BM25Error_DIR = "/home/keping2/data/working/BM25f_simpleError/pos_doc_context"
 MODEL_DIR = "/home/keping2/data/working/pos_doc_context"
+# MODEL_DIR = "/home/keping2/data/working/baseline"
 
 AVAILABLE_CUDA_COUNT = 4
 START_NO = 0
@@ -39,36 +51,83 @@ START_NO = 0
 para_names = ["data_path", "option", "do_cluster", "cluster_method", "n_clusters"]
 short_names = ["", "", "", "", "n_clusters"]
 paras = [
-        ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 3),
-        ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 4),
+        # ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 3),
+        # ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 4),
 
-        ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 3),
-        ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 4),
+        # ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 3),
+        # ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 4),
 
-        ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 3),
-        ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 4),
+        # ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 3),
+        # ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 4),
 
 
-        ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 3),
-        ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 4),
+        # ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 3),
+        # ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 4),
 
-        ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 3),
-        ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 4),
+        # ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 3),
+        # ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 4),
 
-        ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 3),
-        ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 4),
+        # ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 3),
+        # ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 4),
         
-        ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 0),
-        ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 1),
-        ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 2),
+        # ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 0),
+        # ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 1),
+        # ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 2),
 
-        ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 0),
-        ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 1),
-        ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 2),
+        # ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 0),
+        # ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 1),
+        # ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 2),
 
-        ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 0),
-        ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 1),
-        ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 2),
+        # ("by_users", "add_doc_score", "none", "none", 0, 1),
+        # ("by_time", "add_doc_score", "none", "none", 0, 1),
+
+        # ("by_users", "add_doc_score", "none", "none", 0, 2),
+        # ("by_time", "add_doc_score", "none", "none", 0, 2),
+
+        # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 0),
+        ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 0),
+
+        ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 1),
+        ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 1),
+
+        ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 2),
+        ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 2),
+
+        # ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 1),
+        # ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 1),
+
+        # ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 1),
+        # ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 1),
+
+        # ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 1),
+        # ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 1),
+
+        # ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 2),
+        # ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 2),
+
+        # ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 2),
+        # ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 2),
+
+        # ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 2),
+        # ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 2),
+
+        # ("by_users", "add_doc_score", "none", "none", 0, 6),
+        # ("by_time", "add_doc_score", "none", "none", 0, 6),
+
+        # ("by_users", "add_doc_score", "none", "none", 0, 0),
+        # ("by_time", "add_doc_score", "none", "none", 0, 0),
+
+        # ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 0),
+        # ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 0),
+
+        # ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10, 0),
+        # ("by_time", "add_query_context", "soft", "MiniBatchKMeans", 10, 0),
+
+        # ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 0),
+        # ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 0),
+
+        # ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 1),
+        # ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 2),
 
 
         # ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 0),
@@ -100,12 +159,17 @@ paras = [
         # ("by_users", "add_query_context", "soft", "MiniBatchKMeans", 10),
         ]
 
-postfix_dic = {"add_query_context_none": "qcontext_emb",
-              "add_query_context_hard": "qcluster_hard",
-              "add_query_context_soft": "qcluster_soft",
+postfix_dic = {
+              "add_doc_score_none": "docscore",
               "add_query_context_none": "qcontext_emb",
               "add_query_context_hard": "qcluster_hard",
-              "add_query_context_soft": "qcluster_soft"}
+              "add_query_context_soft": "qcluster_soft",
+              "add_query_context_combine": "qcluster_combine",
+
+              "add_user_context_none": "ucontext_emb",
+              "add_user_context_hard": "ucluster_hard",
+              "add_user_context_soft": "ucluster_soft", 
+              }
 
 outfname = os.path.splitext(os.path.splitext(os.path.basename(FEAT_FILE))[0])[0]
 # index = 4

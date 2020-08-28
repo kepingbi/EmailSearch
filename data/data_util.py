@@ -468,6 +468,19 @@ class PersonalSearchData():
         #sort qid according to search time; assign qid an index to indicate its position for the uid
         u_queries_dic = defaultdict(list)
         for qid in q_info_dic:
+            if self.args.unbiased_train:
+                for doc_idx, doc_segs in enumerate(q_info_dic[qid]):
+                # find the document that appear at the first position
+                # and swap the document with the first document in the list
+                # since in unbiased learning, the first position is used for reference
+                    rel_pos = int(doc_segs[feat_name_dic['m:RelevancePosition']])
+                    time_pos = int(doc_segs[feat_name_dic['m:DateTimePosition']])
+                    if rel_pos == 1: # find the first result
+                        tmp_segs = q_info_dic[qid][0]                    
+                        q_info_dic[qid][0] = doc_segs
+                        q_info_dic[qid][doc_idx] = tmp_segs
+                        break
+
             q_info_dic[qid] = q_info_dic[qid][:self.args.candi_doc_count]
             segs = q_info_dic[qid][0] #document list corresponding to qid
             # uid = int(segs[feat_name_dic['m:MailboxId']])

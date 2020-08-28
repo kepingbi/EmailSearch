@@ -216,7 +216,7 @@ def read_doc_scores(rank_file, qdoc_dic):
                 doc_score = float(doc_score)
                 qdoc_dic[qid][int(doc_id)] = doc_score
 
-def add_column_to_file(fname, foutname, qdoc_dic, min_score, max_score):
+def add_column_to_file(fname, foutname, qdoc_dic, min_score, max_score, scale=1000000):
     ''' add converted doc scores to the feature file as an additional feature
     '''
     fout = gzip.open(foutname, "wt") # evaluation in gz
@@ -249,7 +249,7 @@ def add_column_to_file(fname, foutname, qdoc_dic, min_score, max_score):
                 doc_score = (doc_score - min_score) / score_span
             # else:
             #     print(qid, doc_id)
-            doc_score = int(doc_score * 4294967295) # maximum unsigned int 32
+            doc_score = int(doc_score * scale) # 4294967295 maximum unsigned int 32
             line += "\t{}\n".format(doc_score)
             fout.write(line)
     fout.close()
@@ -352,6 +352,63 @@ def add_context_to_file(fname, foutname, context_emb, id_dic, feat_type="QContex
             fout.write(line)
     fout.close()
 
+def add_context_combination_to_file(\
+    fname, foutname, cluster_id_matrix, id_dic, \
+        feat_list=["Recency", "BM25f", "EmailSize"], context_type="QCluster"):
+    ''' Put important features to corresponding cluster slot in the feature file as additional features
+        cluster_id_matrx contains the cluster id for each query or user.
+        id_dic can be query or user to row in context_emb
+        feat_list includes what features to put to different cluster slot.
+    '''
+    print("Putting Important Features to corresponding slots in the feature file!")
+    fout = gzip.open(foutname, "wt") # evaluation in gz
+    line_no = 0
+    n_clusters = len(np.unique(cluster_id_matrix))
+    assert cluster_id_matrix.shape[1] == 1
+    with gzip.open(fname, "rt") as fin:
+        line = fin.readline().strip('\r\n')
+        feat_col_name = line.split('\t')
+        feat_name_dic = {feat_col_name[i]: i for i in range(len(feat_col_name))}
+        if "BM25f_simpleEmail" in feat_name_dic:
+            feat_name_dic["BM25f_simple"] = feat_name_dic["BM25f_simpleEmail"]
+        for feat_type in feat_list:
+            feat_col_name += ["{}_{}_{}".format(feat_type, context_type, x) for x in range(n_clusters)]
+        fout.write("{}\n".format("\t".join(feat_col_name)))
+        qid_column = feat_name_dic['m:QueryId']
+        user_id_column = feat_name_dic['m:MailboxId']
+        max_split = max(qid_column, user_id_column) + 1
+        for line in fin:
+            line_no += 1
+            if line_no % 100000 == 0:
+                print("%d lines has been parsed!" % (line_no))
+            line = line.strip('\r\n')
+            # segs = line.split('\t', maxsplit=max_split)
+            segs = line.split('\t')
+            qid = int(segs[qid_column])
+            u_str = segs[user_id_column]
+            search_time = int(segs[feat_name_dic['AdvancedPreferFeature_123']])
+            created_time = int(segs[feat_name_dic['AdvancedPreferFeature_11']])
+            recency = search_time - created_time
+            BM25f = int(segs[feat_name_dic["BM25f_simple"]])
+            email_size = int(segs[feat_name_dic['AdvancedPreferFeature_17']])
+            key = qid if "Q" in context_type else u_str
+            cur_context_arr = [0] * len(feat_list) * n_clusters
+            if key in id_dic:
+                cluster_id = cluster_id_matrix[id_dic[key]][0] # the only number
+                for idx, feat_type in enumerate(feat_list):
+                    feat_val = 0
+                    if feat_type == "Recency":
+                        feat_val = recency
+                    elif feat_type == "BM25f":
+                        feat_val = BM25f
+                    elif feat_type == "EmailSize":
+                        feat_val = email_size
+                    cur_context_arr[idx * n_clusters + cluster_id] = feat_val
+            cur_context_arr = [str(int(x)) for x in cur_context_arr]
+            line += "\t{}\n".format("\t".join(cur_context_arr))
+            fout.write(line)
+    fout.close()
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--feat_file', '-f', \
@@ -369,12 +426,12 @@ def main():
     parser.add_argument('--out_format', default="lightgbm", \
         choices=["lightgbm", "aether"], help='')
     parser.add_argument('--do_cluster', default="hard", \
-        choices=["hard", "soft", "none"], help='')
+        choices=["hard", "soft", "none", "combine"], help='')
     parser.add_argument('--cluster_method', default="MiniBatchKMeans", \
-        choices=["MiniBatchKMeans", "KMeans", "GaussianMixture", "AgglCluster", "DBSCAN", "FastCluster"], help='')
+        choices=["MiniBatchKMeans", "KMeans", "GaussianMixture", "AgglCluster", "DBSCAN", "FastCluster", "none"], help='')
     parser.add_argument('--n_clusters', default=10, type=int, help='')
     parser.add_argument('--sample_size', default=10000, type=int, help='')
-    parser.add_argument("--show_tsne", type=str2bool, nargs='?', const=True, default=True,
+    parser.add_argument("--show_tsne", type=str2bool, nargs='?', const=True, default=False,
                         help="Analyze the clustering figure.")
 
     paras = parser.parse_args()
@@ -465,8 +522,11 @@ def main():
                         return
                 outfname += "_qcluster_{}.txt.gz".format(paras.do_cluster)
             out_file = os.path.join(paras.rank_dir, outfname)
-            add_context_to_file(paras.feat_file, out_file, \
-                qcontext_int_matrix, qcontext_dic, feat_type="QContext")
+            if paras.do_cluster == "combine":
+                add_context_combination_to_file(paras.feat_file, out_file, qcontext_int_matrix, qcontext_dic)
+            else:
+                add_context_to_file(paras.feat_file, out_file, \
+                    qcontext_int_matrix, qcontext_dic, feat_type="QContext")
         elif paras.option == "add_user_context":
             # only data in train and validation can be used to compute user embedding
             # which do not update often during test time
@@ -551,7 +611,7 @@ def cluster_context_emb(X, n_clusters, cluster_method="MiniBatchKmeans", way="ha
         Z = fastcluster.linkage(X, method='single', metric='euclidean', preserve_input=True)
         y = fcluster(Z, n_clusters, criterion='maxclust')
     if cluster_method not in separate_set:
-        if way == "hard":
+        if not way == "soft":
             y = model.predict(X)
             y = y.reshape(X.shape[0], 1)
         else:

@@ -12,14 +12,20 @@ model_name = "baseline"
 AVAILABLE_CUDA_COUNT = 1
 START_NO = 0
 
-para_names = ["data_path", "lr", "warmup_steps", "max_train_epoch", "l2_lambda", "qinteract"]
-short_names = ["", "lr", "ws", "epoch", "lnorm", "qinter"]
+para_names = ["data_path", "lr", "warmup_steps", "max_train_epoch", "l2_lambda", "qinteract", "unbiased_train"]
+short_names = ["", "lr", "ws", "epoch", "lnorm", "qinter", "unbias"]
 paras = [
         # ["by_users", 0.002, 3000, 20, 0.00001],
         # ["by_time", 0.002, 3000, 20, 0.00005],
 
-        ["by_time", 0.002, 3000, 20, 0.00005, False],
-        ["by_users", 0.002, 3000, 20, 0.00001, False],
+        ["by_time", 0.002, 3000, 10, 0.00005, False, True],
+        ["by_users", 0.002, 3000, 10, 0.00001, False, True],
+
+        # ["by_time", 0.002, 3000, 10, 0.00005, False, False],
+        # ["by_users", 0.002, 3000, 10, 0.00001, False, False],
+
+        # ["by_time", 0.002, 3000, 20, 0.00005, False],
+        # ["by_users", 0.002, 3000, 20, 0.00001, False],
 
         # ["by_time", 0.002, 2000, 10, 0],
         # ["by_users", 0.002, 3000, 10, 0],
@@ -79,6 +85,7 @@ if __name__ == '__main__':
         cmd_arr.append("--model_name %s" % model_name)
         cmd_arr.append("--data_dir %s/%s" % (DATA_PATH, para[0]))
         cmd_arr.append("--input_dir %s" % (INPUT_DIR))
+        # cmd_arr.append("--mode test") # TODO: comment this line for training
         #cmd_arr.append("--eval_train") # evaluate performance on training set after each epoch
         run_name = "_".join(["{}{}".format(x,y) for x,y in zip(short_names, para)])
         save_dir = "~/data/working/%s/%s" % (model_name, run_name)
