@@ -849,7 +849,8 @@ def main():
         samplefname = "%s/sample%.2f_udata.gz" % (paras.data_path, paras.rnd_ratio)
         filtered_ufile = "%s/sample%.2f_hist_len%d_udata.gz" % (
             paras.data_path, paras.rnd_ratio, paras.hist_len)
-        uset, qset = filter_users([samplefname], paras.data_path, filtered_ufile, paras.hist_len)
+        uset, qset = filter_users([samplefname], paras.data_path, \
+            filtered_ufile, paras.hist_len, paras.hist_len_ubound)
         input_feat_file = "%s/extract_sample%.2f_feat_file.txt.gz" % (
             paras.data_path, paras.rnd_ratio)
         output_feat_file = "%s/extract_sample%.2f_hist_len%d_feat_file.txt.gz" % (

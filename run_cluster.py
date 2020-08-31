@@ -14,14 +14,17 @@ RANKDIR_BM25Error_DIC = {"by_time": \
 RANKDIR_DIC = {"by_time": \
     [
         "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue_rndprevFalse_unbiasTrue",
-        "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse_rndprevFalse_unbiasTrue",
+        "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse_rndprevFalse_unbiasTrue", #work
         "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse_rndprevFalse_unbiasTrue",
-        # "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse", \
-        # "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse", \
-        #     "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse", \
-        #         "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqFalse", \
+
+        "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse_rndprevFalse_unbiasTrue",
+
+        "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse",
+        "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse",
+            "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse", # kinda work
+                "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqFalse",
         #         "by_time_embsize128_ff512_h8_layer2_lr0.002_ws2000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue",
-        #         "by_time_lr0.002_ws3000_epoch10_lnorm5e-05_qinterFalse_unbiasTrue",
+                "by_time_lr0.002_ws3000_epoch10_lnorm5e-05_qinterFalse_unbiasTrue",
                 ],
 
                "by_users": \
@@ -29,12 +32,17 @@ RANKDIR_DIC = {"by_time": \
         "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue_rndprevFalse_unbiasTrue",
         "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse_rndprevFalse_unbiasTrue",
         "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse_rndprevFalse_unbiasTrue",
-        # "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse",\
-        # "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse", \
-        #     "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse", \
-        #         "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqFalse", \
+
+        "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posFalse_qFalse_dTrue_qdFalse_curqFalse_rndprevTrue_unbiasTrue",
+        "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posFalse_qFalse_dFalse_qdTrue_curqFalse_rndprevTrue_unbiasTrue",
+        "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse_rndprevFalse_unbiasTrue",
+
+        "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dFalse_qdTrue_curqFalse",\
+        "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdFalse_curqFalse", \
+            "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qFalse_dTrue_qdTrue_curqFalse", \
+                "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqFalse", \
         #         "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue", \
-        #         "by_users_lr0.002_ws3000_epoch10_lnorm1e-05_qinterFalse_unbiasTrue",
+                "by_users_lr0.002_ws3000_epoch10_lnorm1e-05_qinterFalse_unbiasTrue",
                     ]}
 
 script_path = "python preprocess/feature_extract.py"
@@ -78,20 +86,60 @@ paras = [
         # ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 1),
         # ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 2),
 
+        # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 3),
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 3),
+
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 4),
+        # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 4),
+
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 5),
+        # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 5),
+
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 6),
+        # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 6),
+
+        # ("by_users", "add_doc_score", "none", "none", 0, -1),
+        # ("by_time", "add_doc_score", "none", "none", 0, -1),
+
+        # ("by_users", "add_doc_score", "none", "none", 0, 0),
+        # ("by_time", "add_doc_score", "none", "none", 0, 0),
+
         # ("by_users", "add_doc_score", "none", "none", 0, 1),
         # ("by_time", "add_doc_score", "none", "none", 0, 1),
 
         # ("by_users", "add_doc_score", "none", "none", 0, 2),
         # ("by_time", "add_doc_score", "none", "none", 0, 2),
 
+
+        # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 3),
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 3),
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 4),
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 5),
+
         # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 0),
-        ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 0),
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 0),
 
-        ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 1),
-        ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 1),
+        ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 1),
 
-        ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 2),
-        ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 2),
+        # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 5, 1),
+        # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 15, 1),
+        # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 20, 1),
+
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 20, 1),
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 20, 2),
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 20, 3),
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 20, 4),
+
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 30, 1),
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 30, 2),
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 30, 3),
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 30, 4),
+
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 1),
+        # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 1),
+
+        # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 2),
+        # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 2),
 
         # ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 1),
         # ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 1),
@@ -110,12 +158,6 @@ paras = [
 
         # ("by_users", "add_query_context", "none", "MiniBatchKMeans", 10, 2),
         # ("by_time", "add_query_context", "none", "MiniBatchKMeans", 10, 2),
-
-        # ("by_users", "add_doc_score", "none", "none", 0, 6),
-        # ("by_time", "add_doc_score", "none", "none", 0, 6),
-
-        # ("by_users", "add_doc_score", "none", "none", 0, 0),
-        # ("by_time", "add_doc_score", "none", "none", 0, 0),
 
         # ("by_users", "add_query_context", "hard", "MiniBatchKMeans", 10, 0),
         # ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 0),

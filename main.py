@@ -33,7 +33,7 @@ def parse_args():
                         choices=['pos_doc_context', 'baseline'],
                         help="which type of model is used to train")
     parser.add_argument("--use_pos_emb", type=str2bool, nargs='?', const=True, default=True,
-                        help="use positional embeddings when encoding reviews.")
+                        help="use positional embeddings when encoding historical queries with transformers.")
     parser.add_argument("--dropout", default=0.1, type=float)
     parser.add_argument("--token_dropout", default=0.1, type=float)
     parser.add_argument("--optim", type=str, default="adam", help="sgd or adam")
@@ -100,10 +100,6 @@ def parse_args():
                         help="Whether to include q-d-matching features when encoding context.")
     parser.add_argument("--do_curq", type=str2bool, nargs='?', const=True, default=True,
                         help="Whether to include current query features when encoding context.")
-    # parser.add_argument("--doc_occur", type=str, choices=["pos", "bool"],
-    #                     help="Whether docid occur in the history. (positional or boolean)")
-    # parser.add_argument("--conv_occur", type=str, choices=["pos", "bool"],
-    #                     help="Whether docid occur in the history. (positional or boolean)")
     parser.add_argument("--popularity_encoder_name", type=str,
                         default="lstm", choices=["lstm", "transformer"],
                         help="Specify the encoder name for the popularity sequence.")
@@ -126,18 +122,12 @@ def parse_args():
                         help="the number of users previous reviews used.")
     parser.add_argument("--doc_limit_per_q", type=int, default=2,
                         help="the number of item's previous reviews used.")
-    parser.add_argument("--max_train_epoch", type=int, default=5,
+    parser.add_argument("--max_train_epoch", type=int, default=10,
                         help="Limit on the epochs of training (0: no limit).")
     parser.add_argument("--start_epoch", type=int, default=0,
                         help="the epoch where we start training.")
     parser.add_argument("--steps_per_checkpoint", type=int, default=200,
                         help="How many training steps to do per checkpoint.")
-#     parser.add_argument("--qcont_hidden_size", type=int, default=50,
-#                             help="The size of hidden units for query continous features.")
-#     parser.add_argument("--dcont_hidden_size", type=int, default=50,
-#                             help="The size of hidden units for query continous features.")
-#     parser.add_argument("--qdcont_hidden_size", type=int, default=128,
-#                             help="The size of hidden units for query continous features.")
     parser.add_argument("--mode", type=str, default="train", choices=["train", "valid", "test"])
     parser.add_argument("--rankfname", type=str, default="test.best_model.ranklist",
                         help="name for output test ranklist file")

@@ -21,23 +21,30 @@ short_names = ["", "embsize", "ff", "h", "layer", "lr", \
         "ws", "epoch", "lnorm", "prevq", "pos", "q", "d", "qd", "curq", "rndprev", "unbias"]
 paras = [
     # not tested
-        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, False, True, True, False, False, True),
         # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, True, True, True, False, False, True),
         # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 5, True, True, True, True, False, False, True),
 
-        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, False, True, True, False, False, True),
         # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, False, False, True),
         # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 5, True, True, True, True, False, False, True),
+    ######
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, False, True, True, False, False, True),
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, False, True, True, False, False, True),
     #########
-        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, False, False, False, True, False, True, True),
-        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, False, False, True, False, False, True, True),
-        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 4, False, False, False, True, False, True, True),
-        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 6, False, False, False, True, False, True, True),
-        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 8, False, False, False, True, False, True, True),
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, False, False, False, True, False, True, True),
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, False, False, True, False, False, True, True),
 
-        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 4, True, True, True, True, True, False, True),
-        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 6, True, True, True, True, True, False, True),
-        ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 8, True, True, True, True, True, False, True),
+        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 5, False, False, False, True, False, False, True),
+        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 5, False, False, True, False, False, False, True),
+        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 8, False, False, False, True, False, False, True),
+        ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 8, False, False, True, False, False, False, True),
+
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 4, False, False, False, True, False, True, True),
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 6, False, False, False, True, False, True, True),
+        # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 8, False, False, False, True, False, True, True),
+
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 4, True, True, True, True, True, False, True),
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 6, True, True, True, True, True, False, True),
+        # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 8, True, True, True, True, True, False, True),
 
         # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, False, False, True, False, False, True),
         # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, False, True, False, False, False, True),

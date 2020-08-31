@@ -33,20 +33,26 @@ EVAL_START_ARR.append("%s/trove-3.1a1.jar\"" % JAR_PATH)
 EVAL_START_ARR.append(" UnbiasedEvaluationAether")
 EVAL_START_STR = "".join(EVAL_START_ARR)
 #  "fileRelAndImpressions.txt" "fileScore1" "fileScore2" "output.txt"
-EVAL_END_STR = "1234567 10 \"1,3,5,10,100\" \"Softrank\" \"true\""
+# EVAL_END_STR = "1234567 10 \"1,3,5,10,100\" \"Softrank\" \"true\"" # for version 0.0.0.72
+EVAL_END_STR = "1234567 10 \"1,3,5,10,100\" \"Softrank\" \"true:1.0:false:false:false:true:true:false:false:false\"" # for version 0.0.0.82
 
-def train_lambda_rank(rank_dir):
+def train_lambda_rank(rank_dir, is_early_stop=True):
     """ Train and evaluate a lambda rank model
     """
+    version = "_early_stop" if is_early_stop else ""
     train_conf = "%s/train.conf" % CONF_DIR
     test_conf = "%s/predict.conf" % CONF_DIR
-    model_path = "%s/LightGBM_model.txt" % rank_dir # absolute path
-    score_path = "%s/LightGBM_predict_result.txt" % rank_dir
+    # model_path = "%s/LightGBM_model.txt" % rank_dir # absolute path
+    model_path = "%s/LightGBM_model%s.txt" % (rank_dir, version) # absolute path
+    # score_path = "%s/LightGBM_predict_result.txt" % rank_dir
+    score_path = "%s/LightGBM_predict_result%s.txt" % (rank_dir, version)
     train_data = "%s/train_feat.tsv" % rank_dir
     valid_data = "%s/valid_feat.tsv" % rank_dir
     test_data = "%s/test_feat.tsv" % rank_dir
     train_cmd = "%s config=%s output_model=%s train_data=%s valid_data=%s" \
         % (LIGHTGBM, train_conf, model_path, train_data, valid_data)
+    if is_early_stop:
+        train_cmd += " early_stopping_rounds=30"
     test_cmd = "%s config=%s input_model=%s data=%s output_result=%s" \
         % (LIGHTGBM, test_conf, model_path, test_data, score_path)
     print(train_cmd)
@@ -55,9 +61,10 @@ def train_lambda_rank(rank_dir):
     os.system(test_cmd)
     return score_path
 
-def unbiased_pair_eval(rank_dir, score_path, base_file="", evalfname="eval_metrics.txt"):
+def unbiased_pair_eval(rank_dir, score_path, base_file="", evalfname="eval_metrics.txt", is_early_stop=True):
     # Rating QueryId DocId RelevancePosition DateTimePosition Recency
-    eval_dir = "%s/unbiased_eval" % rank_dir
+    version = "_early_stop" if is_early_stop else ""
+    eval_dir = "%s/unbiased_eval%s" % (rank_dir, version)
     eval_file = "%s/%s" % (eval_dir, evalfname)
     # eval_file = "%s/eval_metrics_v65.txt" % eval_dir
     os.system("mkdir -p %s" % eval_dir)
@@ -184,8 +191,11 @@ RANKDIR_BASE_DIC = {"by_time": \
 BASELINE_SCORE_DIC = {"by_time":"/home/keping2/data/input/by_time/unbiased_eval/model_score.txt", \
     "by_users":"/home/keping2/data/input/by_users/unbiased_eval/model_score.txt"}
 
-BASELINE_LN_SCORE_DIC = {"by_time":"/home/keping2/data/working/baseline/by_time_lr0.002_ws3000_epoch10_lnorm5e-05_qinterFalse_unbiasTrue/by_time_add_doc_score_none_none_n_clusters0/unbiased_eval/model_score.txt", \
-    "by_users":"/home/keping2/data/working/baseline/by_users_lr0.002_ws3000_epoch10_lnorm1e-05_qinterFalse_unbiasTrue/by_users_add_doc_score_none_none_n_clusters0/unbiased_eval/model_score.txt"}
+# BASELINE_LN_SCORE_DIC = {"by_time":"/home/keping2/data/working/baseline/by_time_lr0.002_ws3000_epoch10_lnorm5e-05_qinterFalse_unbiasTrue/by_time_add_doc_score_none_none_n_clusters0/unbiased_eval/model_score.txt", \
+#     "by_users":"/home/keping2/data/working/baseline/by_users_lr0.002_ws3000_epoch10_lnorm1e-05_qinterFalse_unbiasTrue/by_users_add_doc_score_none_none_n_clusters0/unbiased_eval/model_score.txt"}
+BASELINE_LN_SCORE_DIC = {"by_time":"/home/keping2/data/working/baseline/by_time_lr0.002_ws3000_epoch10_lnorm5e-05_qinterFalse_unbiasTrue/by_time_add_doc_score_none_none_n_clusters0/unbiased_eval_early_stop/model_score.txt", \
+    "by_users":"/home/keping2/data/working/baseline/by_users_lr0.002_ws3000_epoch10_lnorm1e-05_qinterFalse_unbiasTrue/by_users_add_doc_score_none_none_n_clusters0/unbiased_eval_early_stop/model_score.txt"}
+
 
 BASELINE_SCORE_BM25_ERR_DIC = {\
     "by_time":"/home/keping2/data/input/by_time/BM25f_simple_error/unbiased_eval/model_score.txt", \
@@ -200,6 +210,9 @@ def main():
         choices=["neural", "lambdamart", "eval"], help='')
     parser.add_argument("--qinteract", type=str2bool, nargs='?', const=True, default=True,
                         help="use qinteract==True or False for the baseline version.")
+    parser.add_argument("--early_stop", "-es", type=str2bool, nargs='?', const=True, default=True,
+                        help="use early_stop so that the output model is the one that \
+                            performs the best on validation, otherwise it will use the model from the last iteration.")
 
     paras = parser.parse_args()
     if paras.option == "neural":
@@ -229,10 +242,14 @@ def main():
             fbaseline_score = base_dic["by_time"]
         else:
             fbaseline_score = base_dic["by_users"]
-        score_path = train_lambda_rank(paras.data_path)
-        score_path = "%s/LightGBM_predict_result.txt" % paras.data_path
-        unbiased_pair_eval(paras.data_path, score_path, fbaseline_score)
-        # unbiased_pair_eval(paras.data_path, score_path)
+        if paras.early_stop:
+            fbaseline_score = fbaseline_score.replace("unbiased_eval", "unbiased_eval_early_stop")
+            score_path = train_lambda_rank(paras.data_path, is_early_stop=paras.early_stop)
+            # score_path = "%s/LightGBM_predict_result_early_stop.txt" % paras.data_path
+            unbiased_pair_eval(paras.data_path, score_path, fbaseline_score, "eval_early_stop.txt", is_early_stop=paras.early_stop)
+        else:
+            score_path = train_lambda_rank(paras.data_path)
+            unbiased_pair_eval(paras.data_path, score_path, fbaseline_score)
     else:
         base_dic = BASELINE_LN_SCORE_DIC
         fbaseline_score = base_dic["by_time"] if "by_time" in paras.data_path else base_dic["by_users"]

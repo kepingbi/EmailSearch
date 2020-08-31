@@ -409,6 +409,107 @@ def add_context_combination_to_file(\
             fout.write(line)
     fout.close()
 
+
+def fit_tsne(context_matrix, df, figname=''):
+    # feat_cols = ['feat'+str(i) for i in range(context_matrix.shape[1])]
+    # df = pd.DataFrame(context_matrix, columns=feat_cols)
+    # df['y'] = cluster_id_matrix
+    # randperm = np.random.permutation(context_matrix.shape[0])
+    # #df['y'] = y
+    # #df['label'] = df['y'].apply(lambda i: str(i))
+    # df_subset = df.loc[randperm[:sample_size]].copy()
+    # df_subset = df
+    # data_subset = df_subset[feat_cols].values
+    
+    time_start = time.time()
+    tsne = TSNE(n_components=2, verbose=1, perplexity=40, n_iter=300)
+    tsne_results = tsne.fit_transform(context_matrix)
+    print('t-SNE done! Time elapsed: {} seconds'.format(time.time()-time_start))
+    df['tsne-2d-one'] = tsne_results[:, 0]
+    df['tsne-2d-two'] = tsne_results[:, 1]
+    column_names = ["cluster_id", "item_type", "user_type", \
+        "q_lang_hash", "culture_lcid", "locale_lcid", "action"]
+    for label in column_names:
+        n_colors = len(np.unique(df[label]))
+        plt.figure(figsize=(16, 10))
+        sns.scatterplot(
+            x="tsne-2d-one", y="tsne-2d-two",
+            hue=label,
+            palette=sns.color_palette("hls", n_colors),
+            data=df,
+            legend="full",
+            alpha=0.3
+        )
+        plt.savefig("tsne_figs/tsne_%s_%s%d.pdf" % (figname, label, n_colors))
+
+def cluster_context_emb(X, n_clusters, cluster_method="MiniBatchKmeans", way="hard"):
+    """ cluster each context to clusters
+        X: sample_size, feature_count
+        cluster_method
+        way: hard - output the cluster id
+             soft - output the probability of the sample being in each cluster
+    """
+    separate_set = set(["AgglCluster", "DBSCAN", "FastCluster"])
+    if cluster_method == "KMeans":
+        model = KMeans(n_clusters=n_clusters)
+        model.fit(X)
+    elif cluster_method == "MiniBatchKMeans":
+        model = MiniBatchKMeans(n_clusters=n_clusters)
+        model.fit(X)
+    elif cluster_method == "GaussianMixture":
+        model = GaussianMixture(n_components=n_clusters)
+        model.fit(X)
+    elif cluster_method == "AgglCluster":
+        model = AgglomerativeClustering(n_clusters=n_clusters)
+        y = model.fit_predict(X) # no probability
+    elif cluster_method == "DBSCAN":
+        model = DBSCAN(eps=3, min_samples=30)
+        y = model.fit_predict(X) # no probability
+    elif cluster_method == "FastCluster":
+        Z = fastcluster.linkage(X, method='single', metric='euclidean', preserve_input=True)
+        y = fcluster(Z, n_clusters, criterion='maxclust')
+    if cluster_method not in separate_set:
+        if not way == "soft":
+            y = model.predict(X)
+            y = y.reshape(X.shape[0], 1)
+        else:
+            if cluster_method == "GaussianMixture":
+                y = model.predict_proba(X)
+            else:
+                y = model.transform(X)
+            y = convert_to_int(y)
+    return y # shape: [sample_size, ] or [sample_size, n_clusters]
+
+def collect_ucontext_emb(context_emb_matrix, qcontext_dic, uq_dic):
+    embed_size = context_emb_matrix.shape[1]
+    context_emb_matrix = np.concatenate([context_emb_matrix, np.zeros((1, embed_size))], axis=0)
+    # the last vector is the padding vector
+    uid_dic = dict()
+    u_qid_matrix = []
+    for uid in uq_dic:
+        uid_dic[uid] = len(u_qid_matrix)
+        u_qids = [qcontext_dic[x] for x in uq_dic[uid]]
+        u_qid_matrix.append(u_qids)
+    width = max(len(d) for d in u_qid_matrix)
+    u_qid_matrix = [d[:width] + [-1] * (width - len(d)) for d in u_qid_matrix]
+    u_qid_matrix = np.asarray(u_qid_matrix)
+    ucontext_emb_matrix = context_emb_matrix[u_qid_matrix] # ucount, max_qcount, embed_size
+    mask = np.array(u_qid_matrix == -1, dtype=float)
+    qcount = mask.sum(axis=1)
+    qcount = np.ma.array(qcount, mask=(qcount == 0), fill_value=1).filled()
+    qcount = np.expand_dims(qcount, -1)
+    ucontext_mean_emb = ucontext_emb_matrix.sum(axis=1) / qcount
+    ucontext_mean_emb = convert_to_int(ucontext_mean_emb)
+    return ucontext_mean_emb, uid_dic
+
+def convert_to_int(context_emb_matrix, scale=1000000):
+    dim_max_val = context_emb_matrix.max(axis=0)
+    dim_min_val = context_emb_matrix.min(axis=0)
+    dim_val_span = dim_max_val - dim_min_val
+    context_emb_matrix = (context_emb_matrix - dim_min_val) / dim_val_span
+    # return np.array(context_emb_matrix * scale, dtype=int)
+    return context_emb_matrix * scale
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--feat_file', '-f', \
@@ -525,6 +626,10 @@ def main():
             if paras.do_cluster == "combine":
                 add_context_combination_to_file(paras.feat_file, out_file, qcontext_int_matrix, qcontext_dic)
             else:
+                if paras.do_cluster == "hard":
+                    sparse_y = np.zeros((qcontext_int_matrix.shape[0], n_clusters), dtype=int)
+                    sparse_y[np.expand_dims(np.arange(qcontext_int_matrix.shape[0]), -1), qcontext_int_matrix] = 1
+                    qcontext_int_matrix = sparse_y
                 add_context_to_file(paras.feat_file, out_file, \
                     qcontext_int_matrix, qcontext_dic, feat_type="QContext")
         elif paras.option == "add_user_context":
@@ -551,106 +656,6 @@ def main():
             out_file = os.path.join(paras.rank_dir, outfname)
             add_context_to_file(paras.feat_file, out_file, \
                 ucontext_mean_emb, uid_dic, feat_type="UContext")
-
-def fit_tsne(context_matrix, df, figname=''):
-    # feat_cols = ['feat'+str(i) for i in range(context_matrix.shape[1])]
-    # df = pd.DataFrame(context_matrix, columns=feat_cols)
-    # df['y'] = cluster_id_matrix
-    # randperm = np.random.permutation(context_matrix.shape[0])
-    # #df['y'] = y
-    # #df['label'] = df['y'].apply(lambda i: str(i))
-    # df_subset = df.loc[randperm[:sample_size]].copy()
-    # df_subset = df
-    # data_subset = df_subset[feat_cols].values
-    
-    time_start = time.time()
-    tsne = TSNE(n_components=2, verbose=1, perplexity=40, n_iter=300)
-    tsne_results = tsne.fit_transform(context_matrix)
-    print('t-SNE done! Time elapsed: {} seconds'.format(time.time()-time_start))
-    df['tsne-2d-one'] = tsne_results[:, 0]
-    df['tsne-2d-two'] = tsne_results[:, 1]
-    column_names = ["cluster_id", "item_type", "user_type", \
-        "q_lang_hash", "culture_lcid", "locale_lcid", "action"]
-    for label in column_names:
-        n_colors = len(np.unique(df[label]))
-        plt.figure(figsize=(16, 10))
-        sns.scatterplot(
-            x="tsne-2d-one", y="tsne-2d-two",
-            hue=label,
-            palette=sns.color_palette("hls", n_colors),
-            data=df,
-            legend="full",
-            alpha=0.3
-        )
-        plt.savefig("tsne_figs/tsne_%s_%s%d.pdf" % (figname, label, n_colors))
-
-def cluster_context_emb(X, n_clusters, cluster_method="MiniBatchKmeans", way="hard"):
-    """ cluster each context to clusters
-        X: sample_size, feature_count
-        cluster_method
-        way: hard - output the cluster id
-             soft - output the probability of the sample being in each cluster
-    """
-    separate_set = set(["AgglCluster", "DBSCAN", "FastCluster"])
-    if cluster_method == "KMeans":
-        model = KMeans(n_clusters=n_clusters)
-        model.fit(X)
-    elif cluster_method == "MiniBatchKMeans":
-        model = MiniBatchKMeans(n_clusters=n_clusters)
-        model.fit(X)
-    elif cluster_method == "GaussianMixture":
-        model = GaussianMixture(n_components=n_clusters)
-        model.fit(X)
-    elif cluster_method == "AgglCluster":
-        model = AgglomerativeClustering(n_clusters=n_clusters)
-        y = model.fit_predict(X) # no probability
-    elif cluster_method == "DBSCAN":
-        model = DBSCAN(eps=3, min_samples=30)
-        y = model.fit_predict(X) # no probability
-    elif cluster_method == "FastCluster":
-        Z = fastcluster.linkage(X, method='single', metric='euclidean', preserve_input=True)
-        y = fcluster(Z, n_clusters, criterion='maxclust')
-    if cluster_method not in separate_set:
-        if not way == "soft":
-            y = model.predict(X)
-            y = y.reshape(X.shape[0], 1)
-        else:
-            if cluster_method == "GaussianMixture":
-                y = model.predict_proba(X)
-            else:
-                y = model.transform(X)
-            y = convert_to_int(y)
-    return y # shape: [sample_size, ] or [sample_size, n_clusters]
-
-def collect_ucontext_emb(context_emb_matrix, qcontext_dic, uq_dic):
-    embed_size = context_emb_matrix.shape[1]
-    context_emb_matrix = np.concatenate([context_emb_matrix, np.zeros((1, embed_size))], axis=0)
-    # the last vector is the padding vector
-    uid_dic = dict()
-    u_qid_matrix = []
-    for uid in uq_dic:
-        uid_dic[uid] = len(u_qid_matrix)
-        u_qids = [qcontext_dic[x] for x in uq_dic[uid]]
-        u_qid_matrix.append(u_qids)
-    width = max(len(d) for d in u_qid_matrix)
-    u_qid_matrix = [d[:width] + [-1] * (width - len(d)) for d in u_qid_matrix]
-    u_qid_matrix = np.asarray(u_qid_matrix)
-    ucontext_emb_matrix = context_emb_matrix[u_qid_matrix] # ucount, max_qcount, embed_size
-    mask = np.array(u_qid_matrix == -1, dtype=float)
-    qcount = mask.sum(axis=1)
-    qcount = np.ma.array(qcount, mask=(qcount == 0), fill_value=1).filled()
-    qcount = np.expand_dims(qcount, -1)
-    ucontext_mean_emb = ucontext_emb_matrix.sum(axis=1) / qcount
-    ucontext_mean_emb = convert_to_int(ucontext_mean_emb)
-    return ucontext_mean_emb, uid_dic
-
-def convert_to_int(context_emb_matrix, scale=1000000):
-    dim_max_val = context_emb_matrix.max(axis=0)
-    dim_min_val = context_emb_matrix.min(axis=0)
-    dim_val_span = dim_max_val - dim_min_val
-    context_emb_matrix = (context_emb_matrix - dim_min_val) / dim_val_span
-    # return np.array(context_emb_matrix * scale, dtype=int)
-    return context_emb_matrix * scale
 
 if __name__ == "__main__":
     main()
