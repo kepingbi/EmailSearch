@@ -119,7 +119,10 @@ paras = [
         # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 10, 0),
         # ("by_users", "add_query_context", "combine", "MiniBatchKMeans", 10, 0),
 
+        # ("by_time", "add_query_context", "combine", "neural", 10, 1),
+        # ("by_time", "add_query_context", "combine", "KMeans", 10, 1),
         ("by_time", "add_query_context", "hard", "MiniBatchKMeans", 10, 1),
+        # ("by_time", "add_query_context", "combine", "KMeans", 10, 1),
 
         # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 5, 1),
         # ("by_time", "add_query_context", "combine", "MiniBatchKMeans", 15, 1),
@@ -210,7 +213,7 @@ postfix_dic = {
 
               "add_user_context_none": "ucontext_emb",
               "add_user_context_hard": "ucluster_hard",
-              "add_user_context_soft": "ucluster_soft", 
+              "add_user_context_soft": "ucluster_soft",
               }
 
 outfname = os.path.splitext(os.path.splitext(os.path.basename(FEAT_FILE))[0])[0]

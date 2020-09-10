@@ -7,6 +7,7 @@ from models.group_encoder import AVGEncoder, FSEncoder, RNNEncoder
 from models.transformer import TransformerEncoder
 from models.optimizers import Optimizer
 from models.examination_model import ExaminationModel
+from models.neural_clustering import ClusteringModel
 from others.logging import logger
 from others.util import pad
 
@@ -158,6 +159,8 @@ class BaseEmailRanker(nn.Module):
         self.attn_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
         if self.args.unbiased_train:
             self.exam_model = ExaminationModel(self.embedding_size, self.emb_dropout)
+        if self.args.model_name == "clustering":
+            self.cluster_model = ClusteringModel(self.args.n_clusters, self.embedding_size, device=device)
         #for each q,u,i
         #Q, previous purchases of u, current available reviews for i, padding value
         #self.logsoftmax = torch.nn.LogSoftmax(dim = -1)
@@ -191,17 +194,21 @@ class BaseEmailRanker(nn.Module):
             for rel, datetime, exam in zip(relevance_pos, datetime_pos, norm_exam_output):
                 for idx, doc_rel in enumerate(rel):
                     print("{}_{}:{}".format(doc_rel, datetime[idx], exam[idx]))
+        cluster_prob = None
+        if self.args.model_name == "clustering":
+            cluster_prob = self.cluster_model.soft_t_distribution(context_emb)
+        return doc_scores, context_emb, cluster_prob
 
-            # should be larger than 1
-        return doc_scores, context_emb
-
-    def forward(self, batch_data):
+    def forward(self, batch_data, cluster_target=None):
         candi_doc_ratings = batch_data.candi_doc_ratings
         candi_doc_idxs = batch_data.candi_doc_idxs
         candi_doc_mask = candi_doc_idxs.ne(self.personal_data.doc_pad_idx)
 
         # batch_size, candi_count
-        doc_scores, _ = self.compute_candi_doc_scores(batch_data)
+        doc_scores, context_emb = self.compute_candi_doc_scores(batch_data)
+        if self.args.model_name == "clustering":
+            cluster_loss = self.cluster_model(context_emb, cluster_target)
+            return cluster_loss, None
         if self.args.unbiased_train:
             relevance_pos = batch_data.candi_doc_rel_pos
             datetime_pos = batch_data.candi_doc_time_pos
@@ -361,12 +368,12 @@ class BaseEmailRanker(nn.Module):
         nn.init.normal_(self.subject_prefix_hash_emb.weight)
 
         for name, p in self.named_parameters():
-            if "W1.weight" in name:
+            if "W1.weight" in name or "layer.weight" in name:
                 if logger:
                     logger.info(" {} ({}): Xavier normal init.".format(
                         name, ",".join([str(x) for x in p.size()])))
                 nn.init.xavier_normal_(p)
-            elif "W1.bias" in name:
+            elif "W1.bias" in name or "layer.bias" in name:
                 if logger:
                     logger.info(" {} ({}): constant (0) init.".format(
                         name, ",".join([str(x) for x in p.size()])))

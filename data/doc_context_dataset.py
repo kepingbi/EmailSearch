@@ -45,8 +45,8 @@ class DocContextDataset(Dataset):
                 qid_list.append(int(qid))
         # train_data = personal_data.query_info_dic.keys() #query ids provided in another file
         # load qids for train, validation, and test from separate files.
-        if partition_name == "train" and self.args.filter_train and not self.for_test:
-            qid_list = self.filter_train_qids(qid_list, self.args.hist_len-1)
+        # if partition_name == "train" and self.args.filter_train and not self.for_test:
+        #     qid_list = self.filter_train_qids(qid_list, self.args.hist_len-1)
         return qid_list
 
     def filter_train_qids(self, qid_list, prev_qcount_thre=5):

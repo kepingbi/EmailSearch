@@ -254,7 +254,7 @@ def add_column_to_file(fname, foutname, qdoc_dic, min_score, max_score, scale=10
             fout.write(line)
     fout.close()
 
-def read_context_emb(rank_file, context_emb_matrix, qlist, qcontext_dic, uq_dic):
+def read_context_emb(rank_file, context_emb_matrix, qlist, qcontext_dic, uq_dic, context_cluster_prob=None):
     """ extract context embedding of each query
     """
     with gzip.open(rank_file, 'rt') as frank:
@@ -268,6 +268,9 @@ def read_context_emb(rank_file, context_emb_matrix, qlist, qcontext_dic, uq_dic)
             context_emb = [float(x) for x in query_infos[3].split(',')]
             qcontext_dic[qid] = len(context_emb_matrix)
             context_emb_matrix.append(context_emb)
+            if context_cluster_prob is not None:
+                cluster_prob = [float(x) for x in query_infos[4].split(',')]
+                context_cluster_prob.append(cluster_prob)
             uq_dic[uid].append(qid)
             qlist.append(qid)
 
@@ -313,6 +316,62 @@ def read_meta_info(feat_name, qid_dic):
             action_type = sorted_action[1]
         cur_qid_meta_dic[qid].append(action_type)
     return cur_qid_meta_dic
+
+def output_qu_cluster_id(fname, data_path, out_path, context_emb, id_dic, feat_type="QContext"):
+    ''' add context emb to the feature file as additional features
+        context_emb can be query_context_emb or user_context_emb
+        id_dic can be query or user to row in context_emb
+        feat_type is QContext or UContext
+    '''
+    print("Output query_id, user_id, qcontext cluster id")
+    train_qset, valid_qset, test_qset = set(), set(), set()
+    train_qids = os.path.join(data_path, "train_qids.txt.gz")
+    valid_qids = os.path.join(data_path, "valid_qids.txt.gz")
+    test_qids = os.path.join(data_path, "test_qids.txt.gz")
+    read_qid_from_file(train_qids, train_qset)
+    read_qid_from_file(valid_qids, valid_qset)
+    read_qid_from_file(test_qids, test_qset)
+    ftrain_out = gzip.open("%s/train.clusters.txt.gz" % out_path, "wt")
+    fvalid_out = gzip.open("%s/valid.clusters.txt.gz" % out_path, "wt")
+    ftest_out = gzip.open("%s/test.clusters.txt.gz" % out_path, "wt")
+    line_no = 0
+    embed_size = context_emb.shape[1]
+    output_set = set()
+    with gzip.open(fname, "rt") as fin:
+        line = fin.readline().strip('\r\n')
+        feat_col_name = line.split('\t')
+        feat_name_dic = {feat_col_name[i]: i for i in range(len(feat_col_name))}
+        qid_column = feat_name_dic['m:QueryId']
+        user_id_column = feat_name_dic['m:MailboxId']
+        max_split = max(qid_column, user_id_column) + 1
+        for line in fin:
+            line_no += 1
+            if line_no % 100000 == 0:
+                print("%d lines has been parsed!" % (line_no))
+            line = line.strip('\r\n')
+            segs = line.split('\t', maxsplit=max_split)
+            qid = int(segs[qid_column])
+            u_str = segs[user_id_column]
+            key = qid if "Q" in feat_type else u_str
+            if key in id_dic:
+                cur_context_arr = context_emb[id_dic[key]].tolist()
+            else:
+                print(key)
+                cur_context_arr = [-1] * embed_size # -1 in unsigned int
+            cur_context_arr = [str(int(x)) for x in cur_context_arr]
+            out_line = "{}\t{}\t{}\n".format(qid, u_str, "\t".join(cur_context_arr))
+            if qid in output_set:
+                continue
+            output_set.add(qid)
+            if qid in train_qset:
+                ftrain_out.write(out_line)
+            elif qid in valid_qset:
+                fvalid_out.write(out_line)
+            elif qid in test_qset:
+                ftest_out.write(out_line)
+    ftrain_out.close()
+    fvalid_out.close()
+    ftest_out.close()
 
 def add_context_to_file(fname, foutname, context_emb, id_dic, feat_type="QContext"):
     ''' add context emb to the feature file as additional features
@@ -363,7 +422,7 @@ def add_context_combination_to_file(\
     print("Putting Important Features to corresponding slots in the feature file!")
     fout = gzip.open(foutname, "wt") # evaluation in gz
     line_no = 0
-    n_clusters = len(np.unique(cluster_id_matrix))
+    n_clusters = max(np.unique(cluster_id_matrix)) + 1 #0,1,...,n_clusters-1
     assert cluster_id_matrix.shape[1] == 1
     with gzip.open(fname, "rt") as fin:
         line = fin.readline().strip('\r\n')
@@ -478,7 +537,7 @@ def cluster_context_emb(X, n_clusters, cluster_method="MiniBatchKmeans", way="ha
             else:
                 y = model.transform(X)
             y = convert_to_int(y)
-    return y # shape: [sample_size, ] or [sample_size, n_clusters]
+    return y # shape: [sample_size, 1] or [sample_size, n_clusters]
 
 def collect_ucontext_emb(context_emb_matrix, qcontext_dic, uq_dic):
     embed_size = context_emb_matrix.shape[1]
@@ -529,7 +588,7 @@ def main():
     parser.add_argument('--do_cluster', default="hard", \
         choices=["hard", "soft", "none", "combine"], help='')
     parser.add_argument('--cluster_method', default="MiniBatchKMeans", \
-        choices=["MiniBatchKMeans", "KMeans", "GaussianMixture", "AgglCluster", "DBSCAN", "FastCluster", "none"], help='')
+        choices=["neural", "MiniBatchKMeans", "KMeans", "GaussianMixture", "AgglCluster", "DBSCAN", "FastCluster", "none"], help='')
     parser.add_argument('--n_clusters', default=10, type=int, help='')
     parser.add_argument('--sample_size', default=10000, type=int, help='')
     parser.add_argument("--show_tsne", type=str2bool, nargs='?', const=True, default=False,
@@ -566,6 +625,11 @@ def main():
         test_rank_file = os.path.join(paras.data_path, "test.context.best_model.ranklist.gz")
         valid_rank_file = os.path.join(paras.data_path, "valid.context.best_model.ranklist.gz")
         train_rank_file = os.path.join(paras.data_path, "train.context.best_model.ranklist.gz")
+        if paras.cluster_method == "neural":
+            test_rank_file = os.path.join(paras.data_path, "test.cluster.best_model.ranklist.gz")
+            valid_rank_file = os.path.join(paras.data_path, "valid.cluster.best_model.ranklist.gz")
+            train_rank_file = os.path.join(paras.data_path, "train.cluster.best_model.ranklist.gz")
+
         fname = os.path.basename(paras.feat_file)
         if paras.option == "add_doc_score":
             qdoc_dic = defaultdict(dict)
@@ -585,13 +649,18 @@ def main():
             uq_dic = defaultdict(list)
             qid_list = []
             context_emb_matrix = []
-            read_context_emb(train_rank_file, context_emb_matrix, qid_list, qcontext_dic, uq_dic)
-            read_context_emb(valid_rank_file, context_emb_matrix, qid_list, qcontext_dic, uq_dic)
-            read_context_emb(test_rank_file, context_emb_matrix, qid_list, qcontext_dic, uq_dic)
+            context_cluster_prob = [] if paras.cluster_method == "neural" else None
+            read_context_emb(train_rank_file, context_emb_matrix, qid_list, qcontext_dic, uq_dic, context_cluster_prob)
+            read_context_emb(valid_rank_file, context_emb_matrix, qid_list, qcontext_dic, uq_dic, context_cluster_prob)
+            read_context_emb(test_rank_file, context_emb_matrix, qid_list, qcontext_dic, uq_dic, context_cluster_prob)
             context_emb_matrix = np.asarray(context_emb_matrix, dtype=np.float32)
+            if context_cluster_prob is not None:
+                context_cluster_prob = np.asarray(context_cluster_prob, dtype=np.float32)
             qid_array = np.asarray(qid_list)
             print(context_emb_matrix.shape) # sample_size, hidden_emb_size(128)
             outfname = os.path.splitext(os.path.splitext(fname)[0])[0]
+            data_version = "by_users" if "by_users" in paras.data_path else "by_time"
+
             if paras.do_cluster == "none":
                 qcontext_int_matrix = convert_to_int(context_emb_matrix)
                 outfname += "_qcontext_emb.txt.gz"
@@ -599,6 +668,8 @@ def main():
                 if paras.show_tsne:
                     randperm = np.random.permutation(context_emb_matrix.shape[0])
                     context_emb_matrix = context_emb_matrix[randperm[:paras.sample_size]]
+                    if context_cluster_prob is not None:
+                        context_cluster_prob = context_cluster_prob[randperm[:paras.sample_size]]
                     qid_array = qid_array[randperm[:paras.sample_size]]
                     qdic = set(qid_array)
                     cur_qid_meta_dic = read_meta_info(paras.feat_file, qdic)
@@ -607,10 +678,16 @@ def main():
                     df = pd.DataFrame(np.asarray(qmeta_info), columns=column_names)
                     print(len(df))
 
-                qcontext_int_matrix = cluster_context_emb(
-                    context_emb_matrix, paras.n_clusters, paras.cluster_method, paras.do_cluster)
+                if paras.cluster_method == "neural":
+                    if paras.do_cluster == "soft":
+                        context_cluster_prob = convert_to_int(context_cluster_prob)
+                    else:
+                        qcontext_int_matrix = context_cluster_prob.argmax(axis=-1)
+                        qcontext_int_matrix = qcontext_int_matrix.reshape(-1, 1)
+                else:
+                    qcontext_int_matrix = cluster_context_emb(
+                        context_emb_matrix, paras.n_clusters, paras.cluster_method, paras.do_cluster)
                 print(len(qcontext_int_matrix))
-                data_version = "by_users" if "by_users" in paras.data_path else "by_time"
                 fname = data_version + '_' + paras.cluster_method
                 n_clusters = paras.n_clusters
                 if paras.cluster_method == "DBSCAN":
@@ -626,12 +703,17 @@ def main():
             if paras.do_cluster == "combine":
                 add_context_combination_to_file(paras.feat_file, out_file, qcontext_int_matrix, qcontext_dic)
             else:
-                if paras.do_cluster == "hard":
-                    sparse_y = np.zeros((qcontext_int_matrix.shape[0], n_clusters), dtype=int)
-                    sparse_y[np.expand_dims(np.arange(qcontext_int_matrix.shape[0]), -1), qcontext_int_matrix] = 1
-                    qcontext_int_matrix = sparse_y
+                # if paras.do_cluster == "hard":
+                #     sparse_y = np.zeros((qcontext_int_matrix.shape[0], n_clusters), dtype=int)
+                #     sparse_y[np.expand_dims(np.arange(qcontext_int_matrix.shape[0]), -1), qcontext_int_matrix] = 1
+                #     qcontext_int_matrix = sparse_y
+                data_path = "/home/keping2/data/input/%s" % data_version
+                output_qu_cluster_id(paras.feat_file, data_path, paras.rank_dir, \
+                    qcontext_int_matrix, qcontext_dic)
+                return
                 add_context_to_file(paras.feat_file, out_file, \
                     qcontext_int_matrix, qcontext_dic, feat_type="QContext")
+                
         elif paras.option == "add_user_context":
             # only data in train and validation can be used to compute user embedding
             # which do not update often during test time

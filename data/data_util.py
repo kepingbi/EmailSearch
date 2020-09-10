@@ -476,7 +476,7 @@ class PersonalSearchData():
                     rel_pos = int(doc_segs[feat_name_dic['m:RelevancePosition']])
                     time_pos = int(doc_segs[feat_name_dic['m:DateTimePosition']])
                     if rel_pos == 1: # find the first result
-                        tmp_segs = q_info_dic[qid][0]                    
+                        tmp_segs = q_info_dic[qid][0]
                         q_info_dic[qid][0] = doc_segs
                         q_info_dic[qid][doc_idx] = tmp_segs
                         break

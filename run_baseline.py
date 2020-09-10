@@ -5,24 +5,40 @@ import argparse
 
 INPUT_DIR = "~/data/input"
 hist_len = 11
-DATA_PATH = "%s" % INPUT_DIR # hist_len
+DATA_PATH = "%s/0106_0113_rnd0.20/" % INPUT_DIR
 
 script_path = "python main.py"
 model_name = "baseline"
 AVAILABLE_CUDA_COUNT = 1
 START_NO = 0
 
-para_names = ["data_path", "lr", "warmup_steps", "max_train_epoch", "l2_lambda", "qinteract", "unbiased_train"]
-short_names = ["", "lr", "ws", "epoch", "lnorm", "qinter", "unbias"]
+para_names = ["data_path", "embedding_size", "lr", "warmup_steps", "max_train_epoch", "l2_lambda", "qinteract", "unbiased_train"]
+short_names = ["", "embsize", "lr", "ws", "epoch", "lnorm", "qinter", "unbias"]
 paras = [
-        # ["by_users", 0.002, 3000, 20, 0.00001],
-        # ["by_time", 0.002, 3000, 20, 0.00005],
+        # ["by_users", 0.002, 3000, 10, 0.00001],
+        # ["by_time", 0.002, 3000, 10, 0.00005],
 
-        ["by_time", 0.002, 3000, 10, 0.00005, False, True],
-        ["by_users", 0.002, 3000, 10, 0.00001, False, True],
+        # ["by_time", 0.002, 3000, 10, 0.00005, True],
+        # ["by_time", 0.002, 3000, 10, 0.00001, True],
+        # ["by_time", 0.002, 4000, 10, 0.00005, True],
 
-        # ["by_time", 0.002, 3000, 10, 0.00005, False, False],
-        # ["by_users", 0.002, 3000, 10, 0.00001, False, False],
+        # ["by_users", 0.002, 4000, 10, 0.00001, True],
+        # ["by_users", 0.002, 3000, 10, 0.00001, True],
+        # ["by_users", 0.002, 3000, 10, 0.00005, True],
+
+        ["by_time", 64, 0.002, 3000, 10, 0., True, True],
+        ["by_time", 64, 0.002, 3000, 10, 0., False, True],
+        ["by_time", 32, 0.002, 3000, 10, 0., True, True],
+        ["by_time", 32, 0.002, 3000, 10, 0., False, True],
+
+        # ["by_time", 128, 0.002, 3000, 10, 0.00005, True, True],
+        # ["by_users", 128, 0.002, 3000, 10, 0.00001, True, True],
+        # ["by_time", 64, 0.002, 3000, 10, 0.00005, True, True],
+        # ["by_users", 64, 0.002, 3000, 10, 0.00001, True, True],
+        # ["by_time", 32, 0.002, 3000, 10, 0.00005, True, True],
+        # ["by_users", 32, 0.002, 3000, 10, 0.00001, True, True],
+        # ["by_time", 96, 0.002, 3000, 10, 0.00005, True, True],
+        # ["by_users", 96, 0.002, 3000, 10, 0.00001, True, True],
 
         # ["by_time", 0.002, 3000, 20, 0.00005, False],
         # ["by_users", 0.002, 3000, 20, 0.00001, False],
@@ -82,6 +98,7 @@ if __name__ == '__main__':
         cmd_arr.append("CUDA_VISIBLE_DEVICES=%d" % (cuda_no + START_NO))
         cmd_arr.append(script_path)
         cmd_arr.append("--hist_len %s" % hist_len) # important
+        cmd_arr.append("--rnd_ratio %f" % 0.2) # important
         cmd_arr.append("--model_name %s" % model_name)
         cmd_arr.append("--data_dir %s/%s" % (DATA_PATH, para[0]))
         cmd_arr.append("--input_dir %s" % (INPUT_DIR))

@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument('--seed', default=666, type=int)
     parser.add_argument("--train_from", default='')
     parser.add_argument("--model_name", default='baseline',
-                        choices=['pos_doc_context', 'baseline'],
+                        choices=['pos_doc_context', 'baseline', 'clustering'],
                         help="which type of model is used to train")
     parser.add_argument("--use_pos_emb", type=str2bool, nargs='?', const=True, default=True,
                         help="use positional embeddings when encoding historical queries with transformers.")
@@ -89,7 +89,7 @@ def parse_args():
     parser.add_argument("--unbiased_train", type=str2bool, nargs='?', const=True, default=False,
                         help="Do unbiased learning instead of using biased click data directly.")
     parser.add_argument("--show_propensity", "-sp", type=str2bool, nargs='?', const=True, default=False,
-                        help="Use documents' recent popularity as representation or not.")
+                        help="Show document propensity according to the examination model.")
     parser.add_argument("--qinteract", type=str2bool, nargs='?', const=True, default=True,
                         help="Use query interact with all features or not for the baseline.")
     parser.add_argument("--qfeat", type=str2bool, nargs='?', const=True, default=True,
@@ -105,6 +105,9 @@ def parse_args():
                         help="Specify the encoder name for the popularity sequence.")
     parser.add_argument("--query_encoder_name", type=str, default="fs", choices=["fs", "avg"],
                         help="Specify the network structure to aggregate document of each query.")
+    parser.add_argument("--n_clusters", type=int, default=10, help="Number of clusters.")
+    parser.add_argument("--tol", type=float, default=0.001, \
+        help="The percentage threshold of points that have different labels in two epoches.")
     parser.add_argument("--embedding_size", type=int, default=128, help="Size of each embedding.")
     parser.add_argument("--ff_size", type=int, default=512,
                         help="size of feedforward layers in transformers.")
@@ -120,6 +123,8 @@ def parse_args():
                         help="pop transformer layers")
     parser.add_argument("--prev_q_limit", type=int, default=10,
                         help="the number of users previous reviews used.")
+    parser.add_argument("--test_prev_q_limit", type=int, default=-1,
+                        help="the number of users previous reviews used during testing.")
     parser.add_argument("--doc_limit_per_q", type=int, default=2,
                         help="the number of item's previous reviews used.")
     parser.add_argument("--max_train_epoch", type=int, default=10,
@@ -138,12 +143,13 @@ model_flags = ['embedding_size', 'ff_size', 'heads', 'inter_layers', \
                 'pop_ff_size', 'pop_heads', 'pop_inter_layers', \
                 'popularity_encoder_name', 'query_encoder_name']
 
-def create_model(args, global_data, load_path=''):
+def create_model(args, global_data, load_path='', strict=True):
     """Create translation model and initialize or load parameters in session."""
-    if args.model_name == "pos_doc_context":
-        model = ContextEmailRanker(args, global_data, args.device)
-    else:
+    if args.model_name == "baseline":
         model = BaseEmailRanker(args, global_data, args.device)
+    else: #pos_doc_context, clustering
+        model = ContextEmailRanker(args, global_data, args.device)
+
     if os.path.exists(load_path):
         logger.info('Loading checkpoint from %s' % load_path)
         checkpoint = torch.load(load_path,
@@ -153,7 +159,7 @@ def create_model(args, global_data, load_path=''):
             if k in model_flags:
                 setattr(args, k, opt[k])
         args.start_epoch = checkpoint['epoch']
-        model.load_cp(checkpoint)
+        model.load_cp(checkpoint, strict=strict)
         optim = build_optim(args, model, checkpoint)
     else:
         logger.info('No available model to load. Build new model.')
@@ -182,6 +188,36 @@ def train(args):
     torch.cuda.empty_cache()
     trainer = Trainer(args, best_model, None)
     trainer.test(args, personal_data, "test", args.rankfname)
+
+def train_cluster(args):
+    logger.info('Device %s' % args.device)
+
+    torch.manual_seed(args.seed)
+    random.seed(args.seed)
+    torch.backends.cudnn.deterministic = True
+    if args.device == "cuda":
+        torch.cuda.manual_seed(args.seed)
+
+    global_data = PersonalSearchData(args, args.input_dir)
+    model_path = os.path.join(args.save_dir, 'model_best.ckpt')
+    # model, optim = create_model(args, personal_data, args.train_from)
+    model, optim = create_model(args, global_data, model_path, strict=False)
+    args.start_epoch = 0
+    trainer = Trainer(args, model, optim)
+    best_checkpoint_path = trainer.train_cluster(trainer.args, global_data)
+    # the last one
+    best_model, _ = create_model(args, global_data, best_checkpoint_path)
+    del trainer
+    torch.cuda.empty_cache()
+    trainer = Trainer(args, best_model, None)
+    rankfname = "test.cluster.best_model.ranklist"
+    coll_context_emb = True
+    trainer.test(args, global_data, "test", \
+        rankfname, coll_context_emb=coll_context_emb)
+    trainer.test(args, global_data, "valid", \
+        rankfname.replace("test", "valid"), coll_context_emb=coll_context_emb)
+    trainer.test(args, global_data, "train", \
+        rankfname.replace("test", "train"), coll_context_emb=coll_context_emb)
 
 def validate(args):
     cp_files = sorted(glob.glob(os.path.join(args.save_dir, 'model_epoch_*.ckpt')))
@@ -215,12 +251,30 @@ def validate(args):
 def get_doc_scores(args):
     global_data = PersonalSearchData(args, args.input_dir)
     model_path = os.path.join(args.save_dir, 'model_best.ckpt')
-    best_model, _ = create_model(args, global_data, model_path)
+    best_model, _ = create_model(args, global_data, model_path, strict=True)
     trainer = Trainer(args, best_model, None)
     rankfname = args.rankfname
     coll_context_emb = False
     # if args.model_name == "pos_doc_context":
-    rankfname = "test.context.best_model.ranklist"
+    # rankfname = "test.context.best_model.ranklist" % args.prev_q_limit
+    rankfname = "test.context.best_model.prevq%d.ranklist" % args.test_prev_q_limit
+    coll_context_emb = True
+    trainer.test(args, global_data, "test", \
+        rankfname, coll_context_emb=coll_context_emb)
+    # trainer.test(args, global_data, "valid", \
+    #     rankfname.replace("test", "valid"), coll_context_emb=coll_context_emb)
+    # trainer.test(args, global_data, "train", \
+    #     rankfname.replace("test", "train"), coll_context_emb=coll_context_emb)
+
+def get_doc_clusters(args):
+    global_data = PersonalSearchData(args, args.input_dir)
+    model_path = os.path.join(args.save_dir, 'cluster_model_best.ckpt')
+    best_model, _ = create_model(args, global_data, model_path, strict=False)
+    trainer = Trainer(args, best_model, None)
+    rankfname = args.rankfname
+    coll_context_emb = False
+    # if args.model_name == "pos_doc_context":
+    rankfname = "test.cluster.best_model.ranklist" # % args.prev_q_limit
     coll_context_emb = True
     trainer.test(args, global_data, "test", \
         rankfname, coll_context_emb=coll_context_emb)
@@ -231,15 +285,25 @@ def get_doc_scores(args):
 
 def main(args):
     assert int(args.qfeat) + int(args.dfeat) + int(args.qdfeat) > 0
+    if args.test_prev_q_limit < 0:
+        args.test_prev_q_limit = args.prev_q_limit
+    if args.mode == "train":
+        assert args.prev_q_limit == args.test_prev_q_limit
     if not os.path.isdir(args.save_dir):
         os.makedirs(args.save_dir)
     init_logger(os.path.join(args.save_dir, args.log_file))
     logger.info(args)
     if args.mode == "train":
-        train(args)
+        if args.model_name == "clustering":
+            train_cluster(args)
+        else:
+            train(args)
     elif args.mode == "valid":
         validate(args)
     else:
-        get_doc_scores(args)
+        if args.model_name == "clustering":
+            get_doc_clusters(args)
+        else:
+            get_doc_scores(args)
 if __name__ == '__main__':
     main(parse_args())

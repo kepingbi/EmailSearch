@@ -188,8 +188,8 @@ RANKDIR_BASE_DIC = {"by_time": \
     }
 
 
-BASELINE_SCORE_DIC = {"by_time":"/home/keping2/data/input/by_time/unbiased_eval/model_score.txt", \
-    "by_users":"/home/keping2/data/input/by_users/unbiased_eval/model_score.txt"}
+BASELINE_SCORE_DIC = {"by_time":"/home/keping2/data/input/two_week_rnd0.10/by_time/unbiased_eval/model_score.txt", \
+    "by_users":"/home/keping2/data/input/two_week_rnd0.10/by_users/unbiased_eval/model_score.txt"}
 
 # BASELINE_LN_SCORE_DIC = {"by_time":"/home/keping2/data/working/baseline/by_time_lr0.002_ws3000_epoch10_lnorm5e-05_qinterFalse_unbiasTrue/by_time_add_doc_score_none_none_n_clusters0/unbiased_eval/model_score.txt", \
 #     "by_users":"/home/keping2/data/working/baseline/by_users_lr0.002_ws3000_epoch10_lnorm1e-05_qinterFalse_unbiasTrue/by_users_add_doc_score_none_none_n_clusters0/unbiased_eval/model_score.txt"}
@@ -238,14 +238,14 @@ def main():
                 os.system(cmd)
     elif paras.option == "lambdamart":
         base_dic = BASELINE_SCORE_DIC if paras.version == "BM25Correct" else BASELINE_SCORE_BM25_ERR_DIC
-        if "by_time" in paras.data_path:
-            fbaseline_score = base_dic["by_time"]
-        else:
+        if "by_users" in paras.data_path:
             fbaseline_score = base_dic["by_users"]
+        else:
+            fbaseline_score = base_dic["by_time"]
         if paras.early_stop:
             fbaseline_score = fbaseline_score.replace("unbiased_eval", "unbiased_eval_early_stop")
             score_path = train_lambda_rank(paras.data_path, is_early_stop=paras.early_stop)
-            # score_path = "%s/LightGBM_predict_result_early_stop.txt" % paras.data_path
+            score_path = "%s/LightGBM_predict_result_early_stop.txt" % paras.data_path
             unbiased_pair_eval(paras.data_path, score_path, fbaseline_score, "eval_early_stop.txt", is_early_stop=paras.early_stop)
         else:
             score_path = train_lambda_rank(paras.data_path)

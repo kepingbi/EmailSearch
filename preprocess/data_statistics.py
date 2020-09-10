@@ -151,7 +151,7 @@ def main():
     parser.add_argument('--feat_file2', '-f2', default="")
     parser.add_argument('--data_path', '-data', default="")
     parser.add_argument('--qutime_file', '-qut', default="")
-    parser.add_argument('--bin_count', '-bin', default=20, \
+    parser.add_argument('--bin_count', '-bin', default=10, \
         type=int, help="Bin count for drawing the figure")
     # /home/keping2/data/input/1_27_2_2_data.gz
     paras = parser.parse_args()

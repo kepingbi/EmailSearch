@@ -28,6 +28,8 @@ def calc_dcg(ranklist):
     return dcg_list
 
 def calc_ndcg(ranklist, iranklist, pos=10):
+    #TODO: iranklist = iranklist[:pos] #otherwise, the results may be smaller than it actually is
+    # Keep the numbers comparable, do not add this line back for now
     ranklist = ranklist[:pos]
     dcg = 0.0
     ndcg = 0.0
@@ -246,34 +248,41 @@ def eval_rankfile(para, rank_cut_offs, detail=True):
     #output detailed statistics
 
     if detail:
-        with open(para.eval_file, 'w') as fout:
-            session_q_list = sorted(session_q_mrr.keys()) # qids
-            metrics = ['MAP@50', 'MRR']
-            metrics += ['NDCG@%d' % cutoff for cutoff in rank_cut_offs]
-            metrics += ['NDCG']
-            metrics += ['PRECISION@%d' % cutoff for cutoff in rank_cut_offs]
-            metrics += ['PRECISION']
-            metrics += ['ERR@%d' % cutoff for cutoff in rank_cut_offs]
-            metrics += ['ERR']
-            fout.write("QID\tPREVQCOUNT\t%s\n" % (' '.join(metrics)))
-            for qid in session_q_list:
-                number_str = [str(session_q_map[qid]), str(session_q_mrr[qid])]
-                number_str += ['%f' % x[qid] for x in session_q_ndcg]
-                number_str += ['%f' % x[qid] for x in session_q_precision]
-                number_str += ['%f' % x[qid] for x in session_q_err]
-                fout.write("%s\t%s\t%s\n" % (qid, prev_qcount_dic[qid], ' '.join(number_str)))
+        fout = open(para.eval_file, 'w')
+        # with open(para.eval_file, 'w') as fout:
+        session_q_list = sorted(session_q_mrr.keys()) # qids
+        metrics = ['MAP@50', 'MRR']
+        metrics += ['NDCG@%d' % cutoff for cutoff in rank_cut_offs]
+        metrics += ['NDCG']
+        metrics += ['PRECISION@%d' % cutoff for cutoff in rank_cut_offs]
+        metrics += ['PRECISION']
+        metrics += ['ERR@%d' % cutoff for cutoff in rank_cut_offs]
+        metrics += ['ERR']
+        fout.write("QID\tPREVQCOUNT\t%s\n" % (' '.join(metrics)))
+        for qid in session_q_list:
+            number_str = [str(session_q_map[qid]), str(session_q_mrr[qid])]
+            number_str += ['%f' % x[qid] for x in session_q_ndcg]
+            number_str += ['%f' % x[qid] for x in session_q_precision]
+            number_str += ['%f' % x[qid] for x in session_q_err]
+            fout.write("%s\t%s\t%s\n" % (qid, prev_qcount_dic[qid], ' '.join(number_str)))
 
     metrics, numbers = accumulate_result(rank_cut_offs, session_q_mrr, session_q_map, \
         session_q_ndcg, session_q_precision, session_q_err)
     print('#session-q\t%d' % session_q_count)
     print('#scored-session-q\t%d' % scored_session_q_count)
+    if detail:
+        fout.write('#session-q\t%d\n' % session_q_count)
+        fout.write('#scored-session-q\t%d\n' % scored_session_q_count)
+        for x, y in zip(metrics, numbers):
+            fout.write("%s\t%s\n" % (x, y))
+        fout.close()
     result_dic = dict()
     for x, y in zip(metrics, numbers):
         print("%s\t%s" % (x, y))
         result_dic[x] = y
     return result_dic
 
-RANK_CUT_OFFS = [1, 5, 10] #, 20, 50]
+RANK_CUT_OFFS = [1, 3, 5, 10, 100]
 
 def str2bool(val):
     ''' parse bool type input parameters
@@ -322,6 +331,8 @@ def main():
     #     default="/home/keping2/EmailSearch/model/eval.txt", help='output')
     parser.add_argument('-i', '--from_file', \
         default="", help='output') # /home/keping2/EmailSearch/model/eval.txt
+    parser.add_argument('--rank_file', \
+        default="", help='output') # /home/keping2/EmailSearch/model/eval.txt
     parser.add_argument('--option', \
         default="eval", choices=["eval", "compare"], help='output')
     parser.add_argument('-q', '--qcount_file', \
@@ -329,9 +340,12 @@ def main():
     parser.add_argument("--detail", type=str2bool, nargs='?', const=True, default=True, \
         help='show detail evaluation result for each record')
     para = parser.parse_args(sys.argv[1:])
-    para.rank_file = os.path.join(para.result_dir, "test.best_model.ranklist.gz")
+    if not para.rank_file:
+        para.rank_file = os.path.join(para.result_dir, "test.best_model.ranklist.gz")
+        para.rank_file = os.path.join(para.result_dir, "train.context.best_model.ranklist.gz")
+        para.eval_file = os.path.join(para.result_dir, "eval.txt")
+    para.eval_file = "%s.eval.txt" % para.rank_file
     print(para.rank_file)
-    para.eval_file = os.path.join(para.result_dir, "eval.txt")
     if para.option == "eval":
         result_dic = eval_rankfile(para, RANK_CUT_OFFS, para.detail)
     elif para.option == "compare":

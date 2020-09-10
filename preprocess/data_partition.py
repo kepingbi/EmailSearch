@@ -827,6 +827,7 @@ def main():
         cut_q_u_searchtime(paras.feat_file, paras.output_file)
     elif paras.option == "rnd_sample":
         fname_list = glob.glob("%s/*_qutime.gz" % (paras.data_path))
+        fname_list = fname_list[:1] # only keep the first one
         arr_list = []
         for fname in fname_list:
             read_qutime(fname, arr_list)
@@ -844,7 +845,7 @@ def main():
         # qset = collect_all_qset("%s/by_time" % paras.data_path)
         # output_feat_file = "%s/extract_sample%.2f_hist_len11_feat_file.txt.gz" % (
         #     paras.data_path, paras.rnd_ratio)
-        output_new_feat_file(fname_list, qset, output_feat_file)
+        output_new_feat_file(fname_list[:1], qset, output_feat_file)
     elif paras.option == "filter_users": # overall filter
         samplefname = "%s/sample%.2f_udata.gz" % (paras.data_path, paras.rnd_ratio)
         filtered_ufile = "%s/sample%.2f_hist_len%d_udata.gz" % (
@@ -870,7 +871,7 @@ def main():
                 paras.data_path, paras.rnd_ratio, paras.hist_len)
         ratio = list(map(float, paras.part_ratio.split(',')))
         ratio = [x/sum(ratio) for x in ratio]
-        partition_data(fname, paras.partition_by, paras.data_path, ratio)
+        partition_data(fname, paras.partition_by, paras.data_path+"/0106_0113_rnd%.2f/"%paras.rnd_ratio, ratio)
     else:
         print("Please specify the option")
 if __name__ == "__main__":

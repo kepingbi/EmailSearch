@@ -78,12 +78,19 @@ class ContextEmailRanker(BaseEmailRanker):
         #self.all_feat_hidden_size = 3 * self.embedding_size
         if not self.args.do_curq:
             self.end_cls_emb = nn.Parameter(torch.rand(1, self.embedding_size), requires_grad=True)
-        self.context_q_batch_norm = nn.BatchNorm1d(self.args.prev_q_limit)
-        self.context_d_batch_norm = nn.BatchNorm1d(self.args.prev_q_limit)
-        self.context_qd_batch_norm = nn.BatchNorm1d(self.args.prev_q_limit)
-        self.context_attn_batch_norm = nn.BatchNorm1d(self.args.prev_q_limit)
+        self.prev_q_limit = 1 if self.args.prev_q_limit == 0 else self.args.prev_q_limit
+        # if self.args.mode != "test":
+        self.context_q_batch_norm = nn.BatchNorm1d(self.prev_q_limit)
+        self.context_d_batch_norm = nn.BatchNorm1d(self.prev_q_limit)
+        self.context_qd_batch_norm = nn.BatchNorm1d(self.prev_q_limit)
+        self.context_attn_batch_norm = nn.BatchNorm1d(self.prev_q_limit)
 
-        self.contextq_all_feat_W = nn.Bilinear(self.embedding_size, self.embedding_size, 1)
+        if self.args.qinteract:
+            self.contextq_all_feat_W = nn.Bilinear(self.embedding_size, self.embedding_size, 1)
+        else:
+            self.context_mlp_layer = nn.Linear(self.embedding_size * 2, self.embedding_size//2)
+            self.context_final_layer = nn.Linear(self.embedding_size//2, 1)
+
         self.transformer_encoder = TransformerEncoder(
             self.embedding_size, args.ff_size, args.heads,
             args.dropout, args.inter_layers)
@@ -231,6 +238,8 @@ class ContextEmailRanker(BaseEmailRanker):
             [context_doc_qcont_hidden, context_doc_qdiscrete_hidden], dim=-1)
         context_doc_d_hidden = context_doc_d_hidden.view(
             batch_size, prev_q_limit, -1)
+        # if self.args.mode != "test":
+        #in case the prev_q_limit during test is different from during training
         context_doc_q_hidden = self.context_q_batch_norm(context_doc_q_hidden)
         context_doc_d_hidden = self.context_d_batch_norm(context_doc_d_hidden)
         context_doc_qdcont_hidden = self.context_qd_batch_norm(context_doc_qdcont_hidden)
@@ -238,25 +247,35 @@ class ContextEmailRanker(BaseEmailRanker):
         aggr_context_emb = self.self_attn_weighted_avg(
             context_doc_q_hidden, context_doc_d_hidden, \
                 context_doc_qdcont_hidden, is_candidate=False)
+        # if self.args.mode != "test":
         aggr_context_emb = self.context_attn_batch_norm(aggr_context_emb)
         if self.args.do_curq:
             last_hidden = candi_doc_q_hidden[:, 0, :].unsqueeze(1)
             # batch_size,1,embedding_size
         else:
             last_hidden = self.end_cls_emb.unsqueeze(0).expand(batch_size, -1, -1)
-
-        context_seq_emb = torch.cat([aggr_context_emb, last_hidden], dim=1)
-        # batch_size, prev_q_limit+1, embedding_size
-        context_q_mask = context_qidxs.ne(0) # query pad id
-        context_seq_mask = torch.cat(
-            [context_q_mask, context_q_mask.new_ones(batch_size, 1)], dim=-1)
+        if self.args.prev_q_limit > 0 or self.args.test_prev_q_limit > 0:
+            context_seq_emb = torch.cat([aggr_context_emb, last_hidden], dim=1)
+            # batch_size, prev_q_limit+1, embedding_size
+            context_q_mask = context_qidxs.ne(0) # query pad id
+            context_seq_mask = torch.cat(
+                [context_q_mask, context_q_mask.new_ones(batch_size, 1)], dim=-1)
+        else:
+            context_seq_emb = last_hidden
+            # batch_size, 1, embedding_size
+            context_seq_mask = torch.ones(batch_size, 1, dtype=bool, device=last_hidden.device)
         context_overall_emb = self.transformer_encoder(
             context_seq_emb, context_seq_mask, self.args.use_pos_emb)
         # the embedding corresponding to the last position
         expanded_context_overall_emb = context_overall_emb.unsqueeze(1).expand_as(aggr_candi_emb)
         # batch_size, candi_count, embedding_size
         # candidate score: batch_size, candi_count
-        scores = self.contextq_all_feat_W(expanded_context_overall_emb.contiguous(), aggr_candi_emb)
+        if self.args.qinteract:
+            scores = self.contextq_all_feat_W(expanded_context_overall_emb.contiguous(), aggr_candi_emb)
+        else:
+            concat_overall_emb = torch.cat([aggr_candi_emb, expanded_context_overall_emb], dim=-1)
+            scores = self.context_final_layer(torch.tanh(self.context_mlp_layer(concat_overall_emb)))
+
         # or dot product, probably not as good
         scores = scores.squeeze(-1) * candi_doc_mask
         return scores, context_overall_emb
@@ -293,7 +312,7 @@ class ContextEmailRanker(BaseEmailRanker):
             doc_popularity_emb = self.rating_emb(doc_popularity)
             # batch_size, doc_count, prev_q_limit(+1), rating_embed_size
             pop_seq_emb = doc_popularity_emb.view(
-                -1, self.args.prev_q_limit, self.rating_emb_size)
+                -1, self.prev_q_limit, self.rating_emb_size)
             doc_pop_emb = self.popularity_encoder(pop_seq_emb, doc_mask)
             doc_pop_emb = doc_pop_emb.view(
                 batch_size, doc_count, self.rating_emb_size)
@@ -323,8 +342,21 @@ class ContextEmailRanker(BaseEmailRanker):
         if self.additional_dim > 0:
             nn.init.xavier_normal_(self.ddiscrete_W1.weight)
             nn.init.constant_(self.ddiscrete_W1.bias, 0)
-        nn.init.xavier_normal_(self.contextq_all_feat_W.weight)
-        nn.init.constant_(self.contextq_all_feat_W.bias, 0)
+        if self.args.qinteract:
+            nn.init.xavier_normal_(self.contextq_all_feat_W.weight)
+            nn.init.constant_(self.contextq_all_feat_W.bias, 0)
+
+        for name, p in self.named_parameters():
+            if "layer.weight" in name:
+                if logger:
+                    logger.info(" {} ({}): Xavier normal init.".format(
+                        name, ",".join([str(x) for x in p.size()])))
+                nn.init.xavier_normal_(p)
+            elif "layer.bias" in name:
+                if logger:
+                    logger.info(" {} ({}): constant (0) init.".format(
+                        name, ",".join([str(x) for x in p.size()])))
+                nn.init.constant_(p, 0)
 
         if logger:
             logger.info("ContextEmailRanker initialization finished.")
