@@ -12,18 +12,18 @@ WORKING_DIR = "~/data/working/%s" % (data_version)
 script_path = "python main.py"
 model_name = "baseline"
 AVAILABLE_CUDA_COUNT = 4
-START_NO = 0
+START_NO = 3
 
 para_names = ["data_path", "embedding_size", "lr", "warmup_steps", "max_train_epoch", "l2_lambda", "unbiased_train"]
-short_names = ["", "embsize", "lr", "ws", "epoch", "lnorm", "unbias"]
+short_names = ["", "embsize", "lr", "ws", "epoch", "lnorm", "unbias", "query_attn"]
 paras = [
-        ["by_time_peru", 32, 0.002, 3000, 10, 0.00005, True],
-        ["by_time_peru", 32, 0.002, 3000, 10, 0.00001, True],
+        # ["by_time_peru", 32, 0.002, 3000, 10, 0.00005, True],
+        # ["by_time_peru", 32, 0.002, 3000, 10, 0.00001, True],
 
-        ["by_time_peru", 32, 0.002, 2000, 10, 0.00005, True],
-        ["by_time_peru", 32, 0.002, 4000, 10, 0.00005, True],
+        # ["by_time_peru", 32, 0.002, 2000, 10, 0.00005, True],
+        # ["by_time_peru", 32, 0.002, 4000, 10, 0.00005, True],
 
-        # ["by_time", 32, 0.002, 3000, 10, 0.00005, True],
+        ["by_time", 32, 0.002, 3000, 10, 0.00005, True, True],
         # ["by_time", 32, 0.002, 3000, 10, 0.000001, True],
 
         # ["by_time", 32, 0.002, 2000, 10, 0.00001, True],

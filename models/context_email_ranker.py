@@ -205,8 +205,12 @@ class ContextEmailRanker(BaseEmailRanker):
         candi_doc_q_hidden = torch.cat([candi_doc_qcont_hidden, candi_doc_qdiscrete_hidden], dim=-1)
         candi_doc_d_hidden = torch.cat([candi_doc_dcont_hidden, candi_doc_ddiscrete_hidden], dim=-1)
         candi_doc_q_hidden = candi_doc_q_hidden.unsqueeze(1).expand(-1, candi_doc_count, -1)
-        aggr_candi_emb = self.self_attn_weighted_avg(self.attn_W1, \
-            candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
+        if self.args.query_attn:
+            aggr_candi_emb = self.attn_weighted_avg(
+                candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
+        else:
+            aggr_candi_emb = self.self_attn_weighted_avg(self.attn_W1, \
+                candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
         aggr_candi_emb = self.attn_batch_norm(aggr_candi_emb)
         # collect the representation of the current query.
         # Current query features; current candidate documents;
@@ -280,9 +284,15 @@ class ContextEmailRanker(BaseEmailRanker):
             context_doc_d_hidden = self.context_d_batch_norm(context_doc_d_hidden)
             context_doc_qdcont_hidden = self.context_qd_batch_norm(context_doc_qdcont_hidden)
             attn_W1 = self.pos_attn_W1 if self.args.sep_mapping else self.attn_W1
-            aggr_context_emb = self.self_attn_weighted_avg(attn_W1, \
-                context_doc_q_hidden, context_doc_d_hidden, \
-                    context_doc_qdcont_hidden, is_candidate=False)
+            if self.args.query_attn:
+                aggr_context_emb = self.attn_weighted_avg(
+                    context_doc_q_hidden, context_doc_d_hidden, \
+                        context_doc_qdcont_hidden, is_candidate=False)
+            else:
+                aggr_context_emb = self.self_attn_weighted_avg(attn_W1, \
+                    context_doc_q_hidden, context_doc_d_hidden, \
+                        context_doc_qdcont_hidden, is_candidate=False)
+            
             # if self.args.mode != "test":
             aggr_context_emb = self.context_attn_batch_norm(aggr_context_emb)
 

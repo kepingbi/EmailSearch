@@ -11,20 +11,23 @@ WORKING_DIR = "~/data/working/%s" % (data_version)
 
 script_path = "python main.py"
 model_name = "pos_doc_context"
-AVAILABLE_CUDA_COUNT = 4
-START_NO = 0
+AVAILABLE_CUDA_COUNT = 2
+START_NO = 1
 
 #para_names = ["data_path", "use_popularity", "conv_occur", "doc_occur", \
 para_names = ["data_path", "embedding_size", \
         "heads", "inter_layers", "lr", "warmup_steps", \
         "max_train_epoch", "l2_lambda", "prev_q_limit", "use_pos_emb", \
-            "qfeat", "dfeat", "qdfeat", "rand_prev", "compress", "sep_mapping", "date_emb", "do_curd"]
+            "qfeat", "dfeat", "qdfeat", "rand_prev", "compress", "date_emb", "do_curd", "query_attn"]
 
 short_names = ["", "embsize", "h", "layer", "lr", \
-        "ws", "epoch", "lnorm", "prevq", "pos", "q", "d", "qd", "rndprev", "cprs", "sepm", "date", "curd"]
+        "ws", "epoch", "lnorm", "prevq", "pos", "q", "d", "qd", "rndprev", "cprs", "date", "curd", "query_attn"]
 paras = [
         # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, False, False, False, True),
         # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, True, True, True, False, False, False, True),
+
+        ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, True, True, True, True, False, True, False, False, True),
+        ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, True, False, True, True, False, True, False, False, True),
 
         # ("by_time", 32, 4, 2, 0.002, 4000, 10, 0.00001, 10, True, True, True, True, False, True),
         # ("by_time", 32, 4, 2, 0.002, 3000, 10, 0.00001, 10, True, True, True, True, False, True),
@@ -33,20 +36,21 @@ paras = [
 
         # ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, False, True, True, True, False, True, True, True),
         # ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, False, True, True, True, False, True, False, True),
-        ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, True, True, True, True, False, True, True, False, False),
-        ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, False, True, True, False, False),
+
+        # ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, True, True, True, True, False, True, True, False, False),
+        # ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, False, True, True, False, False),
 
         # ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, True, True, True, True, False, True, False, False, True),
         # ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, False, True, True, True, False, True, False, True, True),
 
-        ("by_time_peru", 32, 4, 2, 0.002, 2000, 20, 0.000005, 5, True, True, True, True, False, True, False, False, False),
-        ("by_time_peru", 32, 4, 2, 0.002, 2000, 20, 0.00001, 5, True, True, True, True, False, True, False, False, False),
+        # ("by_time_peru", 32, 4, 2, 0.002, 2000, 20, 0.000005, 5, True, True, True, True, False, True, False, False, False),
+        # ("by_time_peru", 32, 4, 2, 0.002, 2000, 20, 0.00001, 5, True, True, True, True, False, True, False, False, False),
 
-        ("by_time_peru", 32, 4, 2, 0.002, 2000, 20, 0.000005, 5, True, True, True, True, False, True, False, False, True),
-        ("by_time_peru", 32, 4, 2, 0.002, 2000, 20, 0.00001, 5, True, True, True, True, False, True, False, False, True),
+        # ("by_time_peru", 32, 4, 2, 0.002, 2000, 20, 0.000005, 5, True, True, True, True, False, True, False, False, True),
+        # ("by_time_peru", 32, 4, 2, 0.002, 2000, 20, 0.00001, 5, True, True, True, True, False, True, False, False, True),
 
-        ("by_time_peru", 32, 4, 2, 0.002, 2000, 20, 0.000005, 5, False, True, True, True, False, True, False, True, True),
-        ("by_time_peru", 32, 4, 2, 0.002, 2000, 20, 0.00001, 5, False, True, True, True, False, True, False, True, True),
+        # ("by_time_peru", 32, 4, 2, 0.002, 2000, 20, 0.000005, 5, False, True, True, True, False, True, False, True, True),
+        # ("by_time_peru", 32, 4, 2, 0.002, 2000, 20, 0.00001, 5, False, True, True, True, False, True, False, True, True),
 
         # ("by_time_peru", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, True, True, True, True, False, True, False, False, True),
         # ("by_time_peru", 32, 4, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, False, True, False, False, True),

@@ -104,6 +104,10 @@ def parse_args():
                         help="Whether to include current query features when encoding context.")
     parser.add_argument("--compress", type=str2bool, nargs='?', const=True, default=False,
                         help="Whether to compress the overall embedding before encoding context.")
+    parser.add_argument("--query_attn", type=str2bool, nargs='?', const=True, default=False,
+                        help="Whether to attend to D and QD features with query instead of self-attention.")
+    parser.add_argument("--qattn_heads", default=4, type=int,
+                        help="attention heads in attention with respect to the query")
     parser.add_argument("--sep_mapping", type=str2bool, nargs='?', const=True, default=False,
                         help="Whether to use separate mapping parameters for historical positive documents.")
     parser.add_argument("--date_emb", type=str2bool, nargs='?', const=True, default=False,
@@ -123,8 +127,6 @@ def parse_args():
                         help="size of feedforward layers in pop transformers.")
     parser.add_argument("--heads", default=4, type=int,
                         help="attention heads in transformers")
-    parser.add_argument("--pop_heads", default=8, type=int,
-                        help="attention heads in pop transformers")
     parser.add_argument("--inter_layers", default=2, type=int,
                         help="transformer layers")
     parser.add_argument("--pop_inter_layers", default=2, type=int,

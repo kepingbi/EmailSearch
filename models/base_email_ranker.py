@@ -10,6 +10,7 @@ from models.examination_model import ExaminationModel
 from models.neural_clustering import ClusteringModel
 from others.logging import logger
 from others.util import pad
+from models.neural import MultiHeadedAttention
 
 class BaseEmailRanker(nn.Module):
     ''' baseline ranker that use the same feature set as the lambdamart model.
@@ -149,6 +150,10 @@ class BaseEmailRanker(nn.Module):
         self.ddiscrete_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
         self.emb_dropout = args.dropout
         self.attn_W1 = nn.Linear(self.embedding_size, self.embedding_size)
+        if self.args.query_attn:
+            self.qtoken_emb = nn.Parameter(torch.rand(1, self.embedding_size), requires_grad=True)
+            self.query_mh_attn = MultiHeadedAttention(
+                self.args.qattn_heads, self.embedding_size, dropout=args.dropout)
         if self.args.qinteract:
             self.qInteractFeatW = nn.Bilinear(self.embedding_size, self.embedding_size, 1)
         else:
@@ -260,9 +265,12 @@ class BaseEmailRanker(nn.Module):
 
         expanded_candi_doc_q_hidden = candi_doc_q_hidden.unsqueeze(1).expand(\
             -1, candi_doc_count, -1)
-
-        aggr_candi_emb = self.self_attn_weighted_avg(self.attn_W1,
-            expanded_candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
+        if self.args.query_attn:
+            aggr_candi_emb = self.attn_weighted_avg(
+                expanded_candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
+        else:
+            aggr_candi_emb = self.self_attn_weighted_avg(self.attn_W1,
+                expanded_candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
         aggr_candi_emb = self.attn_batch_norm(aggr_candi_emb)
         # collect the representation of the current query.
         # Current query features; current candidate documents;
@@ -300,7 +308,7 @@ class BaseEmailRanker(nn.Module):
         # batch_size, prev_q_limit/candi_count, embedding_size
         return aggr_emb
 
-    def attn_weighted_avg(self, attn_W1, doc_q_hidden, doc_d_hidden, doc_qdcont_hidden, is_candidate=True):
+    def attn_weighted_avg(self, doc_q_hidden, doc_d_hidden, doc_qdcont_hidden, is_candidate=True):
         ''' doc_q_hidden: batch_size, pre_q_limit/candi_count, embedding_size
             doc_d_hidden: batch_size, pre_q_limit/candi_count, embedding_size
             doc_qd_hidden: batch_size, pre_q_limit/candi_count, embedding_size
@@ -308,22 +316,26 @@ class BaseEmailRanker(nn.Module):
         '''
         assert int(self.args.dfeat) + int(self.args.qdfeat) > 0
         all_feat_arr = []
-        if not is_candidate:
-            if not self.args.dfeat:
-                return doc_qdcont_hidden
-            if not self.args.qdfeat:
-                return doc_d_hidden
-        
-        all_feat_arr = [doc_d_hidden, doc_qdcont_hidden]
-        all_units = torch.stack(
-            all_feat_arr, dim=-2)
+        if self.args.dfeat or is_candidate:
+            all_feat_arr.append(doc_d_hidden)
+        if self.args.qdfeat or is_candidate:
+            all_feat_arr.append(doc_qdcont_hidden)
+        batch_size, doc_count, embedding_size = doc_q_hidden.size()
         # all_units: batch_size, prev_q_limit/candi_count, 2, embedding_size
         # query: batch_size, prev_q_limit/candi_count, 1, embedding_size
-
-        attn = torch.softmax(torch.matmul(doc_q_hidden.unsqueeze(2), all_units.transpose(2, 3)), dim=-1)
-        # batch_size, prev_q_limit/candi_count, 1, 2
-        aggr_emb = torch.matmul(attn, all_units).squeeze(dim=-2)
-        # batch_size, prev_q_limit/candi_count, embedding_size
+        all_units = torch.stack(all_feat_arr, dim=-2)
+        all_units = all_units.view(-1, 2, embedding_size)
+        if self.args.qfeat or is_candidate:
+            q_hidden = doc_q_hidden.contiguous().view(-1, 1, embedding_size)
+        else:
+            q_hidden = self.qtoken_emb.unsqueeze(0).expand(batch_size * doc_count, -1, -1)
+        aggr_emb = self.query_mh_attn(all_units, all_units, q_hidden)
+        aggr_emb = aggr_emb.squeeze(-2).view(batch_size, -1, embedding_size)
+        # attn = torch.softmax(
+        # torch.matmul(doc_q_hidden.unsqueeze(2), all_units.transpose(2, 3)), dim=-1)
+        # # batch_size, prev_q_limit/candi_count, 1, 2
+        # aggr_emb = torch.matmul(attn, all_units).squeeze(dim=-2)
+        # # batch_size, prev_q_limit/candi_count, embedding_size
         aggr_emb = self.dropout_layer(aggr_emb)
         return aggr_emb
 
@@ -394,16 +406,18 @@ class BaseEmailRanker(nn.Module):
         # nn.init.normal_(self.subject_prefix_hash_emb.weight)
 
         for name, p in self.named_parameters():
-            if "W1.weight" in name or "layer.weight" in name:
-                if logger:
-                    logger.info(" {} ({}): Xavier normal init.".format(
-                        name, ",".join([str(x) for x in p.size()])))
-                nn.init.xavier_normal_(p)
-            elif "W1.bias" in name or "layer.bias" in name:
-                if logger:
-                    logger.info(" {} ({}): constant (0) init.".format(
-                        name, ",".join([str(x) for x in p.size()])))
-                nn.init.constant_(p, 0)
+            if ".weight" in name:
+                if "W1" in name or "layer" in name or "linear" in name:
+                    if logger:
+                        logger.info(" {} ({}): Xavier normal init.".format(
+                            name, ",".join([str(x) for x in p.size()])))
+                    nn.init.xavier_normal_(p)
+            elif ".bias" in name:
+                if "W1" in name or "layer" in name or "linear" in name:
+                    if logger:
+                        logger.info(" {} ({}): constant (0) init.".format(
+                            name, ",".join([str(x) for x in p.size()])))
+                    nn.init.constant_(p, 0)
             # else:
             #     if logger:
             #         logger.info(" {} ({}): random normal init.".format(
