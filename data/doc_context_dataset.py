@@ -31,6 +31,7 @@ class DocContextDataset(Dataset):
         self.prev_q_limit = args.prev_q_limit
         self.personal_data = personal_data
         self._data = self.collect_qid_samples(self.personal_data, partition_name)
+        print(partition_name, len(self._data))
 
     def collect_qid_samples(self, personal_data, partition_name):
         # if partition_name == "train":
@@ -43,27 +44,26 @@ class DocContextDataset(Dataset):
                 line = line.strip()
                 qid, _, _ = line.split() # qid, uid, search_time
                 qid_list.append(int(qid))
-        # train_data = personal_data.query_info_dic.keys() #query ids provided in another file
         # load qids for train, validation, and test from separate files.
-        # if partition_name == "train" and self.args.filter_train and not self.for_test:
-        #     qid_list = self.filter_train_qids(qid_list, self.args.hist_len-1)
+        if partition_name == "train" and self.args.filter_train and not self.for_test:
+            qid_list = self.filter_train_qids(qid_list, self.args.prev_q_limit)
         return qid_list
 
     def filter_train_qids(self, qid_list, prev_qcount_thre=5):
         filtered_qids = []
-        rnd_ratio = self.args.rnd_ratio #
+        # rnd_ratio = self.args.rnd_ratio #
         # prev_qcount_thre = self.args.hist_len - 1
-        other_qids = []
+        # other_qids = []
         for qid in qid_list:
             _, prev_qid_count = self.personal_data.query_info_dic[qid][-1]
             #position of qid in the sequence of queries the user issued.
             if prev_qid_count >= prev_qcount_thre:
                 filtered_qids.append(qid)
-            else:
-                other_qids.append(qid)
-        sample_count = int(len(other_qids) * rnd_ratio)
-        sample_qids = random.sample(other_qids, sample_count)
-        filtered_qids += sample_qids
+            # else:
+            #     other_qids.append(qid)
+        # sample_count = int(len(other_qids) * rnd_ratio)
+        # sample_qids = random.sample(other_qids, sample_count)
+        # filtered_qids += sample_qids
         return filtered_qids
 
     def __len__(self):

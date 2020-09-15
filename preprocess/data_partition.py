@@ -495,6 +495,51 @@ def divid_by_time(arr_list, data_path, ratio=[0.9, 0.05, 0.05]):
             else:
                 print("Unexpected error! Query id not in any parition!")
 
+def divid_by_time_per_user(arr_list, data_path, ratio=[-1, 1, 2]):
+    u_qtime = defaultdict(list)
+    for entry in arr_list:
+        qid, uid, search_time = entry
+        u_qtime[uid].append([qid, search_time])
+    for uid in u_qtime:
+        u_qtime[uid].sort(key=lambda x: x[-1])
+    data_path = "%s/by_time_peru" % data_path
+    train_queries = set()
+    valid_queries = set()
+    test_queries = set()
+    _, n_valid, n_test = ratio
+    for uid in u_qtime:
+        qidxs = [qid for qid, _ in u_qtime[uid]]
+        train_queries = train_queries.union(qidxs[:-n_test-n_valid])
+        valid_queries = valid_queries.union(qidxs[-n_test-n_valid:-n_test])
+        test_queries = test_queries.union(qidxs[-n_test:])
+    query_count = len(arr_list)
+    valid_query_count = len(valid_queries)
+    test_query_count = len(test_queries)
+    train_query_count = len(train_queries)
+    print("#Users:%d" % len(u_qtime))
+    print("Query:Total/Train/Valid/Test:%d/%d/%d/%d" % (
+        query_count, train_query_count, valid_query_count, test_query_count))
+    os.makedirs(data_path, exist_ok=True)
+    with gzip.open("%s/train_qids.txt.gz" % data_path, 'wt') as ftrain, \
+        gzip.open("%s/valid_qids.txt.gz" % data_path, "wt") as fvalid, \
+            gzip.open("%s/test_qids.txt.gz" % data_path, "wt") as ftest:
+        head_line = "qid uid search_time\n"
+        ftrain.write(head_line)
+        fvalid.write(head_line)
+        ftest.write(head_line)
+        for entry in arr_list:
+            qid, uid, search_time = entry
+            line = "%d %d %d\n" % (qid, uid, search_time)
+            if qid in train_queries:
+                ftrain.write(line)
+            elif qid in valid_queries:
+                fvalid.write(line)
+            elif qid in test_queries:
+                ftest.write(line)
+            else:
+                print("Unexpected error! Query id not in any parition!")
+
+
 def random_select_users(arr_list, out_dir, rnd_ratio=0.1):
     uset = set()
     for qid, uid, search_time in arr_list:
@@ -519,6 +564,9 @@ def partition_data(fname, partition_by, data_path, ratio=[0.9, 0.05, 0.05]):
         divide_by_user(arr_list, data_path, ratio)
     elif partition_by == "time":
         divid_by_time(arr_list, data_path, ratio)
+    elif partition_by == "time_peru":
+        divid_by_time_per_user(arr_list, data_path, ratio)
+        # ratio = [-1,1,2]
     else:
         print("not a valid option!")
 
@@ -800,7 +848,7 @@ def main():
     # parser.add_argument(
     # '--output_file2', '-o2', default="/home/keping2/data/input/2nd_week_qutime.gz")
     parser.add_argument(
-        '--partition_by', default="user", choices=["user", "time"])
+        '--partition_by', default="user", choices=["user", "time", "time_peru"])
     parser.add_argument(
         '--option', default="none",
         choices=["cut_qu", "partition", "rnd_sample", "filter_users", \
@@ -869,9 +917,13 @@ def main():
         else:
             fname = "%s/sample%.2f_hist_len%d_udata.gz" % (
                 paras.data_path, paras.rnd_ratio, paras.hist_len)
-        ratio = list(map(float, paras.part_ratio.split(',')))
-        ratio = [x/sum(ratio) for x in ratio]
-        partition_data(fname, paras.partition_by, paras.data_path+"/0106_0113_rnd%.2f/"%paras.rnd_ratio, ratio)
+        if paras.partition_by == "time_peru":
+            ratio = list(map(int, paras.part_ratio.split(',')))
+        else:
+            ratio = list(map(float, paras.part_ratio.split(',')))
+            ratio = [x/sum(ratio) for x in ratio]
+        # partition_data(fname, paras.partition_by, paras.data_path+"/0106_0113_rnd%.2f/"%paras.rnd_ratio, ratio)
+        partition_data(fname, paras.partition_by, paras.data_path, ratio)
     else:
         print("Please specify the option")
 if __name__ == "__main__":

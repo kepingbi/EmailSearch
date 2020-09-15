@@ -2,19 +2,37 @@ import sys
 import os
 import argparse
 
-
+data_version = "two_week_rnd0.10"
 INPUT_DIR = "~/data/input"
 hist_len = 11
-DATA_PATH = "%s/0106_0113_rnd0.20/" % INPUT_DIR
+# DATA_PATH = "%s/0106_0113_rnd0.20/" % INPUT_DIR
+DATA_PATH = "%s/%s/" % (INPUT_DIR, data_version)
+WORKING_DIR = "~/data/working/%s" % (data_version)
 
 script_path = "python main.py"
 model_name = "baseline"
-AVAILABLE_CUDA_COUNT = 1
+AVAILABLE_CUDA_COUNT = 4
 START_NO = 0
 
-para_names = ["data_path", "embedding_size", "lr", "warmup_steps", "max_train_epoch", "l2_lambda", "qinteract", "unbiased_train"]
-short_names = ["", "embsize", "lr", "ws", "epoch", "lnorm", "qinter", "unbias"]
+para_names = ["data_path", "embedding_size", "lr", "warmup_steps", "max_train_epoch", "l2_lambda", "unbiased_train"]
+short_names = ["", "embsize", "lr", "ws", "epoch", "lnorm", "unbias"]
 paras = [
+        ["by_time_peru", 32, 0.002, 3000, 10, 0.00005, True],
+        ["by_time_peru", 32, 0.002, 3000, 10, 0.00001, True],
+
+        ["by_time_peru", 32, 0.002, 2000, 10, 0.00005, True],
+        ["by_time_peru", 32, 0.002, 4000, 10, 0.00005, True],
+
+        # ["by_time", 32, 0.002, 3000, 10, 0.00005, True],
+        # ["by_time", 32, 0.002, 3000, 10, 0.000001, True],
+
+        # ["by_time", 32, 0.002, 2000, 10, 0.00001, True],
+        # ["by_time", 32, 0.002, 4000, 10, 0.00001, True],
+
+        # ["by_time", 32, 0.002, 3000, 10, 0., True],
+        # ["by_time", 32, 0.002, 3000, 10, 0.00001, True],
+        # ["by_time", 32, 0.002, 3000, 10, 0.000005, True],
+
         # ["by_users", 0.002, 3000, 10, 0.00001],
         # ["by_time", 0.002, 3000, 10, 0.00005],
 
@@ -26,10 +44,10 @@ paras = [
         # ["by_users", 0.002, 3000, 10, 0.00001, True],
         # ["by_users", 0.002, 3000, 10, 0.00005, True],
 
-        ["by_time", 64, 0.002, 3000, 10, 0., True, True],
-        ["by_time", 64, 0.002, 3000, 10, 0., False, True],
-        ["by_time", 32, 0.002, 3000, 10, 0., True, True],
-        ["by_time", 32, 0.002, 3000, 10, 0., False, True],
+        # ["by_time", 64, 0.002, 3000, 10, 0., True, True],
+        # ["by_time", 64, 0.002, 3000, 10, 0., False, True],
+        # ["by_time", 32, 0.002, 3000, 10, 0., True, True],
+        # ["by_time", 32, 0.002, 3000, 10, 0., False, True],
 
         # ["by_time", 128, 0.002, 3000, 10, 0.00005, True, True],
         # ["by_users", 128, 0.002, 3000, 10, 0.00001, True, True],
@@ -98,14 +116,14 @@ if __name__ == '__main__':
         cmd_arr.append("CUDA_VISIBLE_DEVICES=%d" % (cuda_no + START_NO))
         cmd_arr.append(script_path)
         cmd_arr.append("--hist_len %s" % hist_len) # important
-        cmd_arr.append("--rnd_ratio %f" % 0.2) # important
+        # cmd_arr.append("--rnd_ratio %f" % 0.2) # important for one week data
         cmd_arr.append("--model_name %s" % model_name)
         cmd_arr.append("--data_dir %s/%s" % (DATA_PATH, para[0]))
         cmd_arr.append("--input_dir %s" % (INPUT_DIR))
         # cmd_arr.append("--mode test") # TODO: comment this line for training
         #cmd_arr.append("--eval_train") # evaluate performance on training set after each epoch
         run_name = "_".join(["{}{}".format(x,y) for x,y in zip(short_names, para)])
-        save_dir = "~/data/working/%s/%s" % (model_name, run_name)
+        save_dir = "%s/%s/%s" % (WORKING_DIR, model_name, run_name)
         cmd_arr.append("--save_dir %s" % save_dir)
         log_dir = "logs/%s" % (model_name)
         os.system("mkdir -p %s" % log_dir)

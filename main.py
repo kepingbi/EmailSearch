@@ -29,7 +29,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', default=666, type=int)
     parser.add_argument("--train_from", default='')
-    parser.add_argument("--model_name", default='baseline',
+    parser.add_argument("--model_name", default='pos_doc_context',
                         choices=['pos_doc_context', 'baseline', 'clustering'],
                         help="which type of model is used to train")
     parser.add_argument("--use_pos_emb", type=str2bool, nargs='?', const=True, default=True,
@@ -54,6 +54,8 @@ def parse_args():
                         help="The filter criteron of user queries in the training set.")
     parser.add_argument("--filter_train", type=str2bool, nargs='?', const=True, default=False,
                         help="Filter out some training qids by considering hist_len and rnd_ratio.")
+    parser.add_argument("--do_curd", type=str2bool, nargs='?', const=True, default=False,
+                        help="Use current doc features as the end token for transformers.")
     parser.add_argument("--eval_train", type=str2bool, nargs='?', const=True, default=False,
                         help="Evaluate performances on training set as well.")
     parser.add_argument("--batch_size", type=int, default=128,
@@ -86,11 +88,11 @@ def parse_args():
                         help="Use the position the same thread occur in the past or not.")
     parser.add_argument("--rand_prev", type=str2bool, nargs='?', const=True, default=False,
                         help="Use random previous queries as context.")
-    parser.add_argument("--unbiased_train", type=str2bool, nargs='?', const=True, default=False,
+    parser.add_argument("--unbiased_train", type=str2bool, nargs='?', const=True, default=True,
                         help="Do unbiased learning instead of using biased click data directly.")
     parser.add_argument("--show_propensity", "-sp", type=str2bool, nargs='?', const=True, default=False,
                         help="Show document propensity according to the examination model.")
-    parser.add_argument("--qinteract", type=str2bool, nargs='?', const=True, default=True,
+    parser.add_argument("--qinteract", type=str2bool, nargs='?', const=True, default=False,
                         help="Use query interact with all features or not for the baseline.")
     parser.add_argument("--qfeat", type=str2bool, nargs='?', const=True, default=True,
                         help="Whether to include query-level features when encoding context.")
@@ -98,8 +100,14 @@ def parse_args():
                         help="Whether to include document-level features when encoding context.")
     parser.add_argument("--qdfeat", type=str2bool, nargs='?', const=True, default=True,
                         help="Whether to include q-d-matching features when encoding context.")
-    parser.add_argument("--do_curq", type=str2bool, nargs='?', const=True, default=True,
+    parser.add_argument("--do_curq", type=str2bool, nargs='?', const=True, default=False,
                         help="Whether to include current query features when encoding context.")
+    parser.add_argument("--compress", type=str2bool, nargs='?', const=True, default=False,
+                        help="Whether to compress the overall embedding before encoding context.")
+    parser.add_argument("--sep_mapping", type=str2bool, nargs='?', const=True, default=False,
+                        help="Whether to use separate mapping parameters for historical positive documents.")
+    parser.add_argument("--date_emb", type=str2bool, nargs='?', const=True, default=False,
+                        help="Whether to use date embedding instead of positional embeddings.")
     parser.add_argument("--popularity_encoder_name", type=str,
                         default="lstm", choices=["lstm", "transformer"],
                         help="Specify the encoder name for the popularity sequence.")
@@ -108,12 +116,12 @@ def parse_args():
     parser.add_argument("--n_clusters", type=int, default=10, help="Number of clusters.")
     parser.add_argument("--tol", type=float, default=0.001, \
         help="The percentage threshold of points that have different labels in two epoches.")
-    parser.add_argument("--embedding_size", type=int, default=128, help="Size of each embedding.")
+    parser.add_argument("--embedding_size", type=int, default=32, help="Size of each embedding.")
     parser.add_argument("--ff_size", type=int, default=512,
                         help="size of feedforward layers in transformers.")
     parser.add_argument("--pop_ff_size", type=int, default=512,
                         help="size of feedforward layers in pop transformers.")
-    parser.add_argument("--heads", default=8, type=int,
+    parser.add_argument("--heads", default=4, type=int,
                         help="attention heads in transformers")
     parser.add_argument("--pop_heads", default=8, type=int,
                         help="attention heads in pop transformers")
@@ -127,7 +135,7 @@ def parse_args():
                         help="the number of users previous reviews used during testing.")
     parser.add_argument("--doc_limit_per_q", type=int, default=2,
                         help="the number of item's previous reviews used.")
-    parser.add_argument("--max_train_epoch", type=int, default=10,
+    parser.add_argument("--max_train_epoch", type=int, default=5,
                         help="Limit on the epochs of training (0: no limit).")
     parser.add_argument("--start_epoch", type=int, default=0,
                         help="the epoch where we start training.")
@@ -289,6 +297,8 @@ def main(args):
         args.test_prev_q_limit = args.prev_q_limit
     if args.mode == "train":
         assert args.prev_q_limit == args.test_prev_q_limit
+    if args.date_emb:
+        args.use_pos_emb = False
     if not os.path.isdir(args.save_dir):
         os.makedirs(args.save_dir)
     init_logger(os.path.join(args.save_dir, args.log_file))

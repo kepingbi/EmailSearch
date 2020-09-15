@@ -19,8 +19,7 @@ class BaseEmailRanker(nn.Module):
     g_doc_discrete_features = ["response_requested", "importance", "is_read",
                                "flag_status", "tolist_size", "cclist_size",
                                "bcclist_size", "to_position", "cc_position",
-                               "email_class", # "conversation_hash",
-                               "subject_prefix_hash"]
+                               "email_class"] # "conversation_hash", "subject_prefix_hash"]
 
     g_qdiscrete_feat_idx = {y:x for x, y in enumerate(g_qdiscrete_features)}
     g_doc_discrete_feat_idx = {y:x for x, y in enumerate(g_doc_discrete_features)}
@@ -42,7 +41,7 @@ class BaseEmailRanker(nn.Module):
         self.discrete_qfeat_emb_size = [10, 10, 10, 10, 10, 10, 30]
         # num_q_words, num_q_operators, item_type, locale_lcid, culture_id,
         # query_lang_hash, user_type (consumer or commercial)
-        self.discrete_dfeat_emb_size = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+        self.discrete_dfeat_emb_size = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10] #, 10]
         self.embedding_size = self.args.embedding_size
         # response_requested, importance, is_read, flag_status, email_class
         # conversation_hash, subject_prefix_hash
@@ -125,14 +124,14 @@ class BaseEmailRanker(nn.Module):
         #     len(self.personal_data.conversation_hashes),
         #     self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['conversation_hash']],
         #     padding_idx=0)
-        self.subject_prefix_hash_emb = nn.Embedding(
-            len(self.personal_data.subject_prefix_hashes),
-            self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['subject_prefix_hash']],
-            padding_idx=0)
+        # self.subject_prefix_hash_emb = nn.Embedding(
+        #     len(self.personal_data.subject_prefix_hashes),
+        #     self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['subject_prefix_hash']],
+        #     padding_idx=0)
         self.d_discrete_emb_list = [self.response_request_emb, self.importance_emb, \
             self.is_read_emb, self.flag_emb, self.tolist_size_emb, self.cclist_size_emb, \
                 self.bcclist_size_emb, self.to_position_emb, self.cc_position_emb, \
-                    self.email_class_emb, self.subject_prefix_hash_emb]
+                    self.email_class_emb] #, self.subject_prefix_hash_emb]
             # self.conversation_hash_emb,
         self.qcont_W1 = nn.Linear(
             self.personal_data.qcont_feat_count, self.args.embedding_size//2)
@@ -262,7 +261,7 @@ class BaseEmailRanker(nn.Module):
         expanded_candi_doc_q_hidden = candi_doc_q_hidden.unsqueeze(1).expand(\
             -1, candi_doc_count, -1)
 
-        aggr_candi_emb = self.self_attn_weighted_avg(
+        aggr_candi_emb = self.self_attn_weighted_avg(self.attn_W1,
             expanded_candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
         aggr_candi_emb = self.attn_batch_norm(aggr_candi_emb)
         # collect the representation of the current query.
@@ -275,20 +274,20 @@ class BaseEmailRanker(nn.Module):
         scores = scores.squeeze(-1) * candi_doc_mask
         return scores, candi_doc_q_hidden
 
-    def self_attn_weighted_avg(self, doc_q_hidden, doc_d_hidden, doc_qdcont_hidden, is_candidate=True):
+    def self_attn_weighted_avg(self, attn_W1, doc_q_hidden, doc_d_hidden, doc_qdcont_hidden, is_candidate=True):
         ''' doc_q_hidden: batch_size, pre_q_limit/candi_count, embedding_size
             doc_d_hidden: batch_size, pre_q_limit/candi_count, embedding_size
             doc_qd_hidden: batch_size, pre_q_limit/candi_count, embedding_size
         '''
         all_feat_arr = []
         if self.args.qfeat or is_candidate:
-            doc_q_hidden = torch.tanh(self.attn_W1(doc_q_hidden))
+            doc_q_hidden = torch.tanh(attn_W1(doc_q_hidden))
             all_feat_arr.append(doc_q_hidden)
         if self.args.dfeat or is_candidate:
-            doc_d_hidden = torch.tanh(self.attn_W1(doc_d_hidden))
+            doc_d_hidden = torch.tanh(attn_W1(doc_d_hidden))
             all_feat_arr.append(doc_d_hidden)
         if self.args.qdfeat or is_candidate:
-            doc_qdcont_hidden = torch.tanh(self.attn_W1(doc_qdcont_hidden))
+            doc_qdcont_hidden = torch.tanh(attn_W1(doc_qdcont_hidden))
             all_feat_arr.append(doc_qdcont_hidden)
         all_units = torch.stack(
             all_feat_arr, dim=-2)
@@ -299,6 +298,33 @@ class BaseEmailRanker(nn.Module):
         # batch_size, prev_q_limit/candi_count, 3, 3
         aggr_emb = torch.matmul(attn, all_units).sum(dim=-2)
         # batch_size, prev_q_limit/candi_count, embedding_size
+        return aggr_emb
+
+    def attn_weighted_avg(self, attn_W1, doc_q_hidden, doc_d_hidden, doc_qdcont_hidden, is_candidate=True):
+        ''' doc_q_hidden: batch_size, pre_q_limit/candi_count, embedding_size
+            doc_d_hidden: batch_size, pre_q_limit/candi_count, embedding_size
+            doc_qd_hidden: batch_size, pre_q_limit/candi_count, embedding_size
+            calculate attention weights of D and QD based on Q. Then do avg combine.
+        '''
+        assert int(self.args.dfeat) + int(self.args.qdfeat) > 0
+        all_feat_arr = []
+        if not is_candidate:
+            if not self.args.dfeat:
+                return doc_qdcont_hidden
+            if not self.args.qdfeat:
+                return doc_d_hidden
+        
+        all_feat_arr = [doc_d_hidden, doc_qdcont_hidden]
+        all_units = torch.stack(
+            all_feat_arr, dim=-2)
+        # all_units: batch_size, prev_q_limit/candi_count, 2, embedding_size
+        # query: batch_size, prev_q_limit/candi_count, 1, embedding_size
+
+        attn = torch.softmax(torch.matmul(doc_q_hidden.unsqueeze(2), all_units.transpose(2, 3)), dim=-1)
+        # batch_size, prev_q_limit/candi_count, 1, 2
+        aggr_emb = torch.matmul(attn, all_units).squeeze(dim=-2)
+        # batch_size, prev_q_limit/candi_count, embedding_size
+        aggr_emb = self.dropout_layer(aggr_emb)
         return aggr_emb
 
     def get_hidden_features(self, doc_qcont_features,
@@ -365,7 +391,7 @@ class BaseEmailRanker(nn.Module):
         nn.init.normal_(self.cc_position_emb.weight)
         nn.init.normal_(self.email_class_emb.weight)
         # nn.init.normal_(self.conversation_hash_emb.weight)
-        nn.init.normal_(self.subject_prefix_hash_emb.weight)
+        # nn.init.normal_(self.subject_prefix_hash_emb.weight)
 
         for name, p in self.named_parameters():
             if "W1.weight" in name or "layer.weight" in name:

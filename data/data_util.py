@@ -48,7 +48,7 @@ class PersonalSearchData():
         "AdvancedPreferFeature_153",
         "AdvancedPreferFeature_154",
         "AdvancedPreferFeature_155",
-        "AdvancedPreferFeature_156",
+        # "AdvancedPreferFeature_156",
         "StreamLength_Exchangeemaildisplaycclist",
         "StreamLength_Exchangeemailsubject",
         "StreamLength_Body",
@@ -378,9 +378,10 @@ class PersonalSearchData():
         self.rating_levels = 7
         # not occur, bad, fair, good, excellent, perfect, end_token for transformer
         self.doc_pad_idx = -1
+        self.days_pad_idx = 60 # two months from current search time
         # may need to convert to read multiple feature files TODO
         self.qcont_feat_count = 6
-        self.dcont_feat_count = 3 + len(self.DOC_FEATURES[15:]) # 24
+        self.dcont_feat_count = 3 + 16 #
         self.qdcont_feat_count = len(self.QUERY_DOC_MATCH_FEATURES)
 
     def read_feature_file(self, fname):
@@ -393,7 +394,7 @@ class PersonalSearchData():
         cont_feat_set = set(self.CONT_FEATURES)
         g_max_q_operator_count = 0
         ### dicrete document features (that need to be mapped)###
-        self.subject_prefix_hash_idx_dic, self.subject_prefix_hashes = dict(), [-1]
+        # self.subject_prefix_hash_idx_dic, self.subject_prefix_hashes = dict(), [-1]
         self.email_class_hash_idx_dic, self.email_class_hashes = dict(), [-1]
         # self.conversation_hash_idx_dic, self.conversation_hashes = dict(), [-1]
         # take huge memory but do not have positive effect
@@ -441,11 +442,11 @@ class PersonalSearchData():
                         self.locale_lcid_idxs_dic[locale_lcid] = len(self.locale_lcids)
                         self.locale_lcids.append(locale_lcid)
 
-                    subject_prefix_hash = int(segs[feat_name_dic['AdvancedPreferFeature_156']])
-                    if subject_prefix_hash not in self.subject_prefix_hash_idx_dic:
-                        self.subject_prefix_hash_idx_dic[subject_prefix_hash] \
-                            = len(self.subject_prefix_hashes)
-                        self.subject_prefix_hashes.append(subject_prefix_hash)
+                    # subject_prefix_hash = int(segs[feat_name_dic['AdvancedPreferFeature_156']])
+                    # if subject_prefix_hash not in self.subject_prefix_hash_idx_dic:
+                    #     self.subject_prefix_hash_idx_dic[subject_prefix_hash] \
+                    #         = len(self.subject_prefix_hashes)
+                    #     self.subject_prefix_hashes.append(subject_prefix_hash)
                     email_class_hash = int(segs[feat_name_dic['AdvancedPreferFeature_149']])
                     if email_class_hash not in self.email_class_hash_idx_dic:
                         self.email_class_hash_idx_dic[email_class_hash] \
@@ -576,7 +577,7 @@ class PersonalSearchData():
         doc_cont_features.append(-fct) #normalized by Keping
         email_size = float(segs[feat_name_dic['AdvancedPreferFeature_17']])
         doc_cont_features.append(email_size)
-        for feat in self.DOC_FEATURES[15:]:
+        for feat in self.DOC_FEATURES[-16:]:
             feature = float(segs[feat_name_dic[feat]])
             doc_cont_features.append(feature)
         doc_discrete_features = []
@@ -614,8 +615,8 @@ class PersonalSearchData():
 
         item_class_hash = int(segs[feat_name_dic['AdvancedPreferFeature_149']])
         doc_discrete_features.append(self.email_class_hash_idx_dic[item_class_hash])
-        subject_prefix_hash = int(segs[feat_name_dic['AdvancedPreferFeature_156']])
-        doc_discrete_features.append(self.subject_prefix_hash_idx_dic[subject_prefix_hash])
+        # subject_prefix_hash = int(segs[feat_name_dic['AdvancedPreferFeature_156']])
+        # doc_discrete_features.append(self.subject_prefix_hash_idx_dic[subject_prefix_hash])
         conversation_hash = int(segs[feat_name_dic['AdvancedPreferFeature_153']])
         doc_discrete_features.append(conversation_hash)
         # doc_discrete_features.append(self.conversation_hash_idx_dic[conversation_hash])

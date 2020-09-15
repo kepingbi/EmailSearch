@@ -54,10 +54,10 @@ class Trainer(object):
         current_step = 0
         best_ndcg = 0.
         best_checkpoint_path = ''
+        dataset = self.ExpDataset(args, global_data, "train")
         for current_epoch in range(args.start_epoch+1, args.max_train_epoch+1):
             self.model.train()
             logger.info("Start epoch:%d\n" % current_epoch)
-            dataset = self.ExpDataset(args, global_data, "train")
             dataloader = self.ExpDataloader(
                 args, dataset, batch_size=args.batch_size,
                 shuffle=True, num_workers=args.num_workers)
