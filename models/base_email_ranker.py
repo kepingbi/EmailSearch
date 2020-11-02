@@ -12,41 +12,17 @@ from others.logging import logger
 from others.util import pad
 from models.neural import MultiHeadedAttention
 
-class BaseEmailRanker(nn.Module):
-    ''' baseline ranker that use the same feature set as the lambdamart model.
+class QueryDiscreteEmb(nn.Module):
+    ''' Embeddings of Query-level discrete features.
     '''
     g_qdiscrete_features = ["num_q_words", "num_q_operators", "item_type",
-                            "locale_lcid", "culture_id", "query_lang_hash", "user_type"]
-    g_doc_discrete_features = ["response_requested", "importance", "is_read",
-                               "flag_status", "tolist_size", "cclist_size",
-                               "bcclist_size", "to_position", "cc_position",
-                               "email_class"] # "conversation_hash", "subject_prefix_hash"]
-
+                        "locale_lcid", "culture_id", "query_lang_hash", "user_type"]
     g_qdiscrete_feat_idx = {y:x for x, y in enumerate(g_qdiscrete_features)}
-    g_doc_discrete_feat_idx = {y:x for x, y in enumerate(g_doc_discrete_features)}
-    g_max_weight = 15.
-    # the following should be the same with PersonalSearchData
-    # g_operators_count = 10 # set to 10, otherwise cut
-    # g_tolist_size = 10 # set to 10, otherwise cut
-    # g_cclist_size = 10 # set to 10, otherwise cut
-    # g_bcclist_size = 10 # set to 10, otherwise cut
-    # g_to_position_count = 10 # set to 10, otherwise cut
-    # g_cc_position_count = 10 # set to 10, otherwise cut
 
-    def __init__(self, args, personal_data, device):
-        super(BaseEmailRanker, self).__init__()
-        self.args = args
+    def __init__(self, personal_data, embed_size_list, device):
+        super().__init__()
         self.personal_data = personal_data
-        self.doc_pad_idx = personal_data.doc_pad_idx
-        self.device = device
-        self.discrete_qfeat_emb_size = [10, 10, 10, 10, 10, 10, 30]
-        # num_q_words, num_q_operators, item_type, locale_lcid, culture_id,
-        # query_lang_hash, user_type (consumer or commercial)
-        self.discrete_dfeat_emb_size = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10] #, 10]
-        self.embedding_size = self.args.embedding_size
-        # response_requested, importance, is_read, flag_status, email_class
-        # conversation_hash, subject_prefix_hash
-        # embeddings for query discrete features
+        self.discrete_qfeat_emb_size = embed_size_list
         self.num_qwords_emb = nn.Embedding(
             self.personal_data.g_qwords_count + 1,
             self.discrete_qfeat_emb_size[self.g_qdiscrete_feat_idx['num_q_words']],
@@ -80,7 +56,36 @@ class BaseEmailRanker(nn.Module):
         self.q_discrete_emb_list = [self.num_qwords_emb, self.num_qoperator_emb, \
             self.item_type_emb, self.locale_lcid_emb, self.culture_id_emb, \
                 self.query_lang_emb, self.user_type_emb]
-        # embeddings for document discrete features
+        # self.initialize_parameters(logger) #logger
+
+    def to(self, device):
+        self.to(device) #change model in place
+
+    def initialize_parameters(self, logger=None):
+        if logger:
+            logger.info("Query Discrete Embeddings initialization started.")
+        # embeddings for query discrete features
+        nn.init.normal_(self.num_qwords_emb.weight)
+        nn.init.normal_(self.num_qoperator_emb.weight)
+        nn.init.normal_(self.item_type_emb.weight)
+        nn.init.normal_(self.locale_lcid_emb.weight)
+        nn.init.normal_(self.culture_id_emb.weight)
+        nn.init.normal_(self.query_lang_emb.weight)
+        nn.init.normal_(self.user_type_emb.weight)
+
+class DocDiscreteEmb(nn.Module):
+    ''' Embeddings of Document-level discrete features.
+    '''
+    g_doc_discrete_features = ["response_requested", "importance", "is_read",
+                               "flag_status", "tolist_size", "cclist_size",
+                               "bcclist_size", "to_position", "cc_position",
+                               "email_class"] # "conversation_hash", "subject_prefix_hash"]
+    g_doc_discrete_feat_idx = {y:x for x, y in enumerate(g_doc_discrete_features)}
+    def __init__(self, personal_data, embed_size_list, device):
+        super().__init__()
+        self.personal_data = personal_data
+        self.discrete_dfeat_emb_size = embed_size_list
+
         self.response_request_emb = nn.Embedding(
             3, # 0,1,2 (bool and 0 for padding)
             self.discrete_dfeat_emb_size[self.g_doc_discrete_feat_idx['response_requested']],
@@ -133,21 +138,77 @@ class BaseEmailRanker(nn.Module):
             self.is_read_emb, self.flag_emb, self.tolist_size_emb, self.cclist_size_emb, \
                 self.bcclist_size_emb, self.to_position_emb, self.cc_position_emb, \
                     self.email_class_emb] #, self.subject_prefix_hash_emb]
-            # self.conversation_hash_emb,
+        # self.initialize_parameters(logger) #logger
+
+    def to(self, device):
+        self.to(device) #change model in place
+
+    def initialize_parameters(self, logger=None):
+        if logger:
+            logger.info("Document Discrete Embeddings initialization started.")
+        # embeddings for document discrete features
+        nn.init.normal_(self.response_request_emb.weight)
+        nn.init.normal_(self.importance_emb.weight)
+        nn.init.normal_(self.is_read_emb.weight)
+        nn.init.normal_(self.flag_emb.weight)
+        nn.init.normal_(self.tolist_size_emb.weight)
+        nn.init.normal_(self.cclist_size_emb.weight)
+        nn.init.normal_(self.bcclist_size_emb.weight)
+        nn.init.normal_(self.to_position_emb.weight)
+        nn.init.normal_(self.cc_position_emb.weight)
+        nn.init.normal_(self.email_class_emb.weight)
+        # nn.init.normal_(self.conversation_hash_emb.weight)
+        # nn.init.normal_(self.subject_prefix_hash_emb.weight)
+
+class BaseEmailRanker(nn.Module):
+    ''' baseline ranker that use the same feature set as the lambdamart model.
+    '''
+    g_max_weight = 15.
+    # the following should be the same with PersonalSearchData
+    # g_operators_count = 10 # set to 10, otherwise cut
+    # g_tolist_size = 10 # set to 10, otherwise cut
+    # g_cclist_size = 10 # set to 10, otherwise cut
+    # g_bcclist_size = 10 # set to 10, otherwise cut
+    # g_to_position_count = 10 # set to 10, otherwise cut
+    # g_cc_position_count = 10 # set to 10, otherwise cut
+
+    def __init__(self, args, personal_data, device):
+        super(BaseEmailRanker, self).__init__()
+        self.args = args
+        self.personal_data = personal_data
+        self.doc_pad_idx = personal_data.doc_pad_idx
+        self.device = device
+        self.discrete_qfeat_emb_size = [10, 10, 10, 10, 10, 10, 30]
+        # num_q_words, num_q_operators, item_type, locale_lcid, culture_id,
+        # query_lang_hash, user_type (consumer or commercial)
+        self.discrete_dfeat_emb_size = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10] #, 10]
+        self.qdiscrete_emb_set = QueryDiscreteEmb(
+            personal_data, self.discrete_qfeat_emb_size, device)
+        self.q_discrete_emb_list = self.qdiscrete_emb_set.q_discrete_emb_list
+        self.ddiscrete_emb_set = DocDiscreteEmb(
+            personal_data, self.discrete_dfeat_emb_size, device)
+        self.d_discrete_emb_list = self.ddiscrete_emb_set.d_discrete_emb_list
+        self.embedding_size = self.args.embedding_size
+        # response_requested, importance, is_read, flag_status, email_class
+        # conversation_hash, subject_prefix_hash
+        # embeddings for query discrete features
         self.qcont_W1 = nn.Linear(
             self.personal_data.qcont_feat_count, self.args.embedding_size//2)
         self.qcont_batch_norm = nn.BatchNorm1d(self.args.embedding_size//2)
         self.dcont_W1 = nn.Linear(
             self.personal_data.dcont_feat_count, self.args.embedding_size//2)
-        self.dcont_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
+        # self.dcont_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
+        self.dcont_batch_norm = nn.BatchNorm1d(self.args.embedding_size//2)
         self.qdcont_W1 = nn.Linear(
             self.personal_data.qdcont_feat_count, self.args.embedding_size)
-        self.qdcont_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
+        # self.qdcont_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
+        self.qdcont_batch_norm = nn.BatchNorm1d(self.args.embedding_size)
         self.qdiscrete_W1 = nn.Linear(sum(self.discrete_qfeat_emb_size), int(self.embedding_size/2))
         self.qdiscrete_batch_norm = nn.BatchNorm1d(self.args.embedding_size//2)
         self.discrete_dfeat_hidden_size = sum(self.discrete_dfeat_emb_size) # + self.rating_emb_size
         self.ddiscrete_W1 = nn.Linear(self.discrete_dfeat_hidden_size, int(self.embedding_size/2))
-        self.ddiscrete_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
+        # self.ddiscrete_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
+        self.ddiscrete_batch_norm = nn.BatchNorm1d(self.args.embedding_size//2)
         self.emb_dropout = args.dropout
         self.attn_W1 = nn.Linear(self.embedding_size, self.embedding_size)
         if self.args.query_attn:
@@ -155,12 +216,17 @@ class BaseEmailRanker(nn.Module):
             self.query_mh_attn = MultiHeadedAttention(
                 self.args.qattn_heads, self.embedding_size, dropout=args.dropout)
         if self.args.qinteract:
-            self.qInteractFeatW = nn.Bilinear(self.embedding_size, self.embedding_size, 1)
+            self.qInteractFeatW = nn.Bilinear(
+                self.embedding_size, self.args.context_emb_size, self.args.slice_k)
+            self.concat_W = nn.Linear(
+                self.embedding_size + self.args.context_emb_size, self.args.slice_k)
+            self.final_W = nn.Linear(self.args.slice_k, 1)
         else:
             self.mlp_layer = nn.Linear(self.embedding_size, self.embedding_size//2)
             self.final_layer = nn.Linear(self.embedding_size//2, 1)
         self.dropout_layer = nn.Dropout(p=args.dropout)
-        self.attn_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
+        # self.attn_batch_norm = nn.BatchNorm1d(self.args.candi_doc_count)
+        self.attn_batch_norm = nn.BatchNorm1d(self.args.embedding_size)
         if self.args.unbiased_train:
             self.exam_model = ExaminationModel(self.embedding_size, self.emb_dropout)
         if self.args.model_name == "clustering":
@@ -177,12 +243,17 @@ class BaseEmailRanker(nn.Module):
     def load_cp(self, pt, strict=True):
         self.load_state_dict(pt['model'], strict=strict)
 
-    def test(self, batch_data):
-        candi_doc_idxs = batch_data.candi_doc_idxs
-        #candi_doc_mask = candi_doc_idxs.ne(self.personal_data.doc_pad_idx)
+    def test(self, batch_data, test_ranker=False):
+        if self.args.model_name == "match_patterns" and not test_ranker:
+            context_emb = self.encode_context(batch_data)
+            context_loss, context_scores, doc_scores = self.collab_train(
+                batch_data, ranker_batch=None, context_overall_emb=context_emb)
+            scores = context_scores if doc_scores is None else doc_scores
+            return scores, context_emb, None
 
+        # candi_doc_idxs = batch_data.candi_doc_idxs
+        #candi_doc_mask = candi_doc_idxs.ne(self.personal_data.doc_pad_idx)
         # batch_size, candi_count
-        doc_scores, context_emb = self.compute_candi_doc_scores(batch_data)
         # mask already applied when computing the scores.
         if self.args.unbiased_train and self.args.show_propensity:
             relevance_pos = batch_data.candi_doc_rel_pos
@@ -198,21 +269,36 @@ class BaseEmailRanker(nn.Module):
             for rel, datetime, exam in zip(relevance_pos, datetime_pos, norm_exam_output):
                 for idx, doc_rel in enumerate(rel):
                     print("{}_{}:{}".format(doc_rel, datetime[idx], exam[idx]))
+        doc_scores, context_emb = self.compute_candi_doc_scores(batch_data)
         cluster_prob = None
         if self.args.model_name == "clustering":
             cluster_prob = self.cluster_model.soft_t_distribution(context_emb)
         return doc_scores, context_emb, cluster_prob
 
-    def forward(self, batch_data, cluster_target=None):
+    def forward(self, batch_data, cluster_target=None, ranker_batch=None):
+        rel_loss, context_loss, exam_loss, cluster_loss = None, None, None, None
+        if self.args.model_name == "match_patterns":
+            context_loss, context_scores, doc_scores = self.collab_train(batch_data, ranker_batch)
+            if doc_scores is None:
+                return rel_loss, exam_loss, context_loss
+            batch_data = ranker_batch
+        else:
+            # batch_size, candi_count
+            dcontext_emb = None
+            if self.args.train_from: # load previously trained model
+                context_overall_emb = self.encode_context(batch_data)
+                dcontext_emb = context_overall_emb.detach().clone()
+
+            doc_scores, context_emb = self.compute_candi_doc_scores(
+                batch_data, context_overall_emb=dcontext_emb)
+            if self.args.model_name == "clustering":
+                cluster_loss = self.cluster_model(context_emb, cluster_target)
+                return cluster_loss, None
+
         candi_doc_ratings = batch_data.candi_doc_ratings
         candi_doc_idxs = batch_data.candi_doc_idxs
         candi_doc_mask = candi_doc_idxs.ne(self.personal_data.doc_pad_idx)
 
-        # batch_size, candi_count
-        doc_scores, context_emb = self.compute_candi_doc_scores(batch_data)
-        if self.args.model_name == "clustering":
-            cluster_loss = self.cluster_model(context_emb, cluster_target)
-            return cluster_loss, None
         if self.args.unbiased_train:
             relevance_pos = batch_data.candi_doc_rel_pos
             datetime_pos = batch_data.candi_doc_time_pos
@@ -232,14 +318,14 @@ class BaseEmailRanker(nn.Module):
         else:
             rel_loss = -self.logsoftmax(doc_scores) * candi_doc_ratings.float()
             # loss = -self.logsoftmax(doc_scores) * (candi_doc_ratings.float().exp()-1)
-            exam_loss = None
         rel_loss = rel_loss * candi_doc_mask.float()
         rel_loss = rel_loss.sum(-1).mean()
-        return rel_loss, exam_loss
+        return rel_loss, exam_loss, context_loss
 
-    def compute_candi_doc_scores(self, batch_data):
+    def compute_candi_doc_scores(self, batch_data, context_overall_emb=None):
         """ compute the scores of candidate documents in the batch
         """
+        qcontext_emb = batch_data.qcontext_emb
         candi_doc_idxs = batch_data.candi_doc_idxs
         candi_doc_qcont_features = batch_data.candi_doc_qcont_features
         candi_doc_qdiscrete_features = batch_data.candi_doc_qdiscrete_features
@@ -261,34 +347,49 @@ class BaseEmailRanker(nn.Module):
         # print(candi_doc_mask)
         candi_doc_q_hidden = torch.cat([candi_doc_qcont_hidden, candi_doc_qdiscrete_hidden], dim=-1)
         candi_doc_d_hidden = torch.cat([candi_doc_dcont_hidden, candi_doc_ddiscrete_hidden], dim=-1)
-        _, candi_doc_count = candi_doc_idxs.size()
+        batch_size, candi_doc_count, emb_size = candi_doc_d_hidden.size()
 
         expanded_candi_doc_q_hidden = candi_doc_q_hidden.unsqueeze(1).expand(\
             -1, candi_doc_count, -1)
+        if qcontext_emb is not None:
+            qcontext_emb = qcontext_emb.unsqueeze(1).expand(-1, candi_doc_count, -1)
+        expanded_qcontext_emb = None if qcontext_emb is None or self.args.qinteract else qcontext_emb
+
         if self.args.query_attn:
             aggr_candi_emb = self.attn_weighted_avg(
                 expanded_candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
         else:
+            # print(expanded_qcontext_emb)
             aggr_candi_emb = self.self_attn_weighted_avg(self.attn_W1,
-                expanded_candi_doc_q_hidden, candi_doc_d_hidden, candi_doc_qdcont_hidden)
-        aggr_candi_emb = self.attn_batch_norm(aggr_candi_emb)
+                expanded_candi_doc_q_hidden, candi_doc_d_hidden,
+                    candi_doc_qdcont_hidden, qcontext_emb=expanded_qcontext_emb)
+        aggr_candi_emb = self.attn_batch_norm(aggr_candi_emb.view(-1, emb_size))
+        aggr_candi_emb = aggr_candi_emb.view(batch_size, -1, emb_size)
         # collect the representation of the current query.
         # Current query features; current candidate documents;
         if self.args.qinteract:
-            scores = self.qInteractFeatW(expanded_candi_doc_q_hidden.contiguous(), aggr_candi_emb)
+            assert qcontext_emb is not None
+            bilinear_out = self.qInteractFeatW(
+                aggr_candi_emb.contiguous(), qcontext_emb.contiguous())
+            concat_out = self.concat_W(
+                torch.cat([aggr_candi_emb, qcontext_emb], dim=-1))
+            scores = self.final_W(bilinear_out + concat_out)
         else:
             scores = self.final_layer(torch.tanh(self.mlp_layer(aggr_candi_emb)))
         # or dot product, probably not as good
         scores = scores.squeeze(-1) * candi_doc_mask
         return scores, candi_doc_q_hidden
 
-    def self_attn_weighted_avg(self, attn_W1, doc_q_hidden, doc_d_hidden, doc_qdcont_hidden, is_candidate=True):
+    def self_attn_weighted_avg(self, attn_W1, \
+        doc_q_hidden, doc_d_hidden, doc_qdcont_hidden, \
+            qcontext_emb=None, is_candidate=True):
         ''' doc_q_hidden: batch_size, pre_q_limit/candi_count, embedding_size
             doc_d_hidden: batch_size, pre_q_limit/candi_count, embedding_size
             doc_qd_hidden: batch_size, pre_q_limit/candi_count, embedding_size
         '''
         all_feat_arr = []
         if self.args.qfeat or is_candidate:
+        # if self.args.qfeat:
             doc_q_hidden = torch.tanh(attn_W1(doc_q_hidden))
             all_feat_arr.append(doc_q_hidden)
         if self.args.dfeat or is_candidate:
@@ -297,6 +398,10 @@ class BaseEmailRanker(nn.Module):
         if self.args.qdfeat or is_candidate:
             doc_qdcont_hidden = torch.tanh(attn_W1(doc_qdcont_hidden))
             all_feat_arr.append(doc_qdcont_hidden)
+        if qcontext_emb is not None and self.args.model_name == "mp_context":
+            qcontext_emb = torch.tanh(attn_W1(qcontext_emb))
+            all_feat_arr.append(qcontext_emb)
+
         all_units = torch.stack(
             all_feat_arr, dim=-2)
             # batch_size, prev_q_limit/candi_count, 3, embedding_size
@@ -314,7 +419,8 @@ class BaseEmailRanker(nn.Module):
             doc_qd_hidden: batch_size, pre_q_limit/candi_count, embedding_size
             calculate attention weights of D and QD based on Q. Then do avg combine.
         '''
-        assert int(self.args.dfeat) + int(self.args.qdfeat) > 0
+        n_source = int(self.args.dfeat) + int(self.args.qdfeat)
+        assert n_source > 0
         all_feat_arr = []
         if self.args.dfeat or is_candidate:
             all_feat_arr.append(doc_d_hidden)
@@ -324,7 +430,7 @@ class BaseEmailRanker(nn.Module):
         # all_units: batch_size, prev_q_limit/candi_count, 2, embedding_size
         # query: batch_size, prev_q_limit/candi_count, 1, embedding_size
         all_units = torch.stack(all_feat_arr, dim=-2)
-        all_units = all_units.view(-1, 2, embedding_size)
+        all_units = all_units.view(-1, n_source, embedding_size)
         if self.args.qfeat or is_candidate:
             q_hidden = doc_q_hidden.contiguous().view(-1, 1, embedding_size)
         else:
@@ -348,9 +454,12 @@ class BaseEmailRanker(nn.Module):
         doc_dcont_hidden = torch.tanh(self.dcont_W1(doc_dcont_features))
         doc_qdcont_hidden = torch.tanh(self.qdcont_W1(doc_qdcont_features))
 
+        batch_size, doc_count, emb_size = doc_dcont_hidden.size()
         doc_qcont_hidden = self.qcont_batch_norm(doc_qcont_hidden)
-        doc_dcont_hidden = self.dcont_batch_norm(doc_dcont_hidden)
-        doc_qdcont_hidden = self.qdcont_batch_norm(doc_qdcont_hidden)
+        doc_dcont_hidden = self.dcont_batch_norm(doc_dcont_hidden.view(-1, emb_size))
+        doc_qdcont_hidden = self.qdcont_batch_norm(doc_qdcont_hidden.view(batch_size * doc_count, -1))
+        doc_dcont_hidden = doc_dcont_hidden.view(batch_size, -1, emb_size)
+        doc_qdcont_hidden = doc_qdcont_hidden.view(batch_size, doc_count, -1)
         # batch_size, qdiscrete_feature_count
         # cat_qdiscret_list = []
         # for idx in range(len(self.q_discrete_emb_list)):
@@ -373,7 +482,8 @@ class BaseEmailRanker(nn.Module):
         doc_ddiscrete_hidden = torch.tanh(self.ddiscrete_W1(doc_ddiscrete_mapped))
 
         doc_qdiscrete_hidden = self.qdiscrete_batch_norm(doc_qdiscrete_hidden)
-        doc_ddiscrete_hidden = self.ddiscrete_batch_norm(doc_ddiscrete_hidden)
+        doc_ddiscrete_hidden = self.ddiscrete_batch_norm(doc_ddiscrete_hidden.view(-1, emb_size))
+        doc_ddiscrete_hidden = doc_ddiscrete_hidden.view(batch_size, -1, emb_size)
 
         return doc_qcont_hidden, doc_dcont_hidden, doc_qdcont_hidden, \
             doc_qdiscrete_hidden, doc_ddiscrete_hidden
@@ -383,45 +493,27 @@ class BaseEmailRanker(nn.Module):
         if logger:
             logger.info("BaseEmailRanker initialization started.")
         # embeddings for query discrete features
-        nn.init.normal_(self.num_qwords_emb.weight)
-        nn.init.normal_(self.num_qoperator_emb.weight)
-        nn.init.normal_(self.item_type_emb.weight)
-        nn.init.normal_(self.locale_lcid_emb.weight)
-        nn.init.normal_(self.culture_id_emb.weight)
-        nn.init.normal_(self.query_lang_emb.weight)
-        nn.init.normal_(self.user_type_emb.weight)
-
-        # embeddings for document discrete features
-        nn.init.normal_(self.response_request_emb.weight)
-        nn.init.normal_(self.importance_emb.weight)
-        nn.init.normal_(self.is_read_emb.weight)
-        nn.init.normal_(self.flag_emb.weight)
-        nn.init.normal_(self.tolist_size_emb.weight)
-        nn.init.normal_(self.cclist_size_emb.weight)
-        nn.init.normal_(self.bcclist_size_emb.weight)
-        nn.init.normal_(self.to_position_emb.weight)
-        nn.init.normal_(self.cc_position_emb.weight)
-        nn.init.normal_(self.email_class_emb.weight)
-        # nn.init.normal_(self.conversation_hash_emb.weight)
-        # nn.init.normal_(self.subject_prefix_hash_emb.weight)
-
         for name, p in self.named_parameters():
-            if ".weight" in name:
-                if "W1" in name or "layer" in name or "linear" in name:
+            if "emb" in name:
+                continue
+            if "weight" in name and p.dim() > 1:
+                # if "W1" in name or "layer" in name or "linear" in name:
                     if logger:
                         logger.info(" {} ({}): Xavier normal init.".format(
                             name, ",".join([str(x) for x in p.size()])))
                     nn.init.xavier_normal_(p)
             elif ".bias" in name:
-                if "W1" in name or "layer" in name or "linear" in name:
+                # if "W1" in name or "layer" in name or "linear" in name:
                     if logger:
                         logger.info(" {} ({}): constant (0) init.".format(
                             name, ",".join([str(x) for x in p.size()])))
                     nn.init.constant_(p, 0)
-            # else:
-            #     if logger:
-            #         logger.info(" {} ({}): random normal init.".format(
-            #             name, ",".join([str(x) for x in p.size()])))
-            #     nn.init.normal_(p)
+            else:
+                if logger:
+                    logger.info(" {} ({}): random normal init.".format(
+                        name, ",".join([str(x) for x in p.size()])))
+                nn.init.normal_(p)
+        self.ddiscrete_emb_set.initialize_parameters(logger)
+        self.qdiscrete_emb_set.initialize_parameters(logger)
         if logger:
             logger.info("BaseEmailRanker initialization finished.")

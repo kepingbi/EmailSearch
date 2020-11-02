@@ -26,11 +26,14 @@ class DocContextDataset(Dataset):
         self.candi_doc_count = args.candi_doc_count
         self.doc_pad_idx = personal_data.doc_pad_idx
         self.for_test = for_test
+        random.seed(args.seed)
         # self.rating_pad_idx = 6
         # {"NotAppear": 0, "Bad": 1, "Fair":2, "Good": 3, "Excellent": 4, "Perfect": 5}
         self.prev_q_limit = args.prev_q_limit
         self.personal_data = personal_data
-        self._data = self.collect_qid_samples(self.personal_data, partition_name)
+        self.query_list = self.collect_qid_samples(self.personal_data, partition_name)
+        self._data = self.query_list
+        self.train_ranker = False # for model match_patterns
         print(partition_name, len(self._data))
 
     def collect_qid_samples(self, personal_data, partition_name):
@@ -46,8 +49,20 @@ class DocContextDataset(Dataset):
                 qid_list.append(int(qid))
         # load qids for train, validation, and test from separate files.
         if partition_name == "train" and self.args.filter_train and not self.for_test:
-            qid_list = self.filter_train_qids(qid_list, self.args.prev_q_limit)
+            qid_list = self.filter_train_qids(qid_list, 2) # self.args.prev_q_limit//2
         return qid_list
+
+    def initialize_epoch(self, train_ranker=False):
+        """ Return negk qid for each qid that will be trained as positive samples
+        """
+        neg_qids = np.random.choice(self.query_list,
+                                 size=(len(self.query_list), self.args.neg_k), replace=True).tolist()
+        paired_qids = list(zip(self.query_list, neg_qids))
+        self._data = paired_qids
+        self.train_ranker = train_ranker
+
+    def set_get_ranker_batch(self, train_ranker=False):
+        self.train_ranker = train_ranker
 
     def filter_train_qids(self, qid_list, prev_qcount_thre=5):
         filtered_qids = []

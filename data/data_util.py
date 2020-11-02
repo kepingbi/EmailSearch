@@ -8,6 +8,7 @@ from collections import defaultdict
 import others.util as util
 import gzip
 import os
+import glob
 
 #Read files from gzip feature file
 #Q, associated d (rating), uid,
@@ -383,6 +384,19 @@ class PersonalSearchData():
         self.qcont_feat_count = 6
         self.dcont_feat_count = 3 + 16 #
         self.qdcont_feat_count = len(self.QUERY_DOC_MATCH_FEATURES)
+        if self.args.model_name == "match_patterns":
+            self.q_pos_didx_dic = self.collect_pos_document(self.feature_name_dic, self.query_info_dic)
+        if self.args.model_name == "mp_context":
+            test_rank_file = glob.glob("%s/test.context.best_model.*.ranklist.gz" % (self.args.context_file_dir))[0]
+            valid_rank_file = glob.glob("%s/valid.context.best_model.*.ranklist.gz" % (self.args.context_file_dir))[0]
+            train_rank_file = glob.glob("%s/train.context.best_model.*.ranklist.gz" % (self.args.context_file_dir))[0]
+            # test_rank_file = os.path.join(self.args.context_file_dir, "test.context.best_model.prev5.ranklist.gz")
+            # valid_rank_file = os.path.join(self.args.context_file_dir, "valid.context.best_model.prev5.ranklist.gz")
+            # train_rank_file = os.path.join(self.args.context_file_dir, "train.context.best_model.prev5.ranklist.gz")
+            self.qcontext_dic = dict()
+            self.read_context_emb(self.qcontext_dic, train_rank_file)
+            self.read_context_emb(self.qcontext_dic, valid_rank_file)
+            self.read_context_emb(self.qcontext_dic, test_rank_file)
 
     def read_feature_file(self, fname):
         ### discrete query features (that need to be mapped)###
@@ -501,6 +515,32 @@ class PersonalSearchData():
                 # the last element of the value list is the idx of qid in user's search sequence.
 
         return u_queries_dic, user_idx_dic, user_idx_list
+
+    def collect_pos_document(self, feat_name_dic, q_info_dic):
+        # only keep perfect and excellent documents
+        q_pos_didx_dic = defaultdict(list)
+        for qid in q_info_dic:
+            for idx, segs in enumerate(q_info_dic[qid][:-1]):
+                rating = PersonalSearchData.RATING_MAP[
+                    segs[feat_name_dic['m:Rating']]]
+                if rating < 3:
+                    continue
+                q_pos_didx_dic[qid].append(idx)
+        return q_pos_didx_dic
+
+    def read_context_emb(self, qcontext_dic, rank_file):
+        """ extract context embedding of each query
+        """
+        with gzip.open(rank_file, 'rt') as frank:
+            for line in frank:
+                line = line.strip('\n')
+                segs = line.split('\t')
+                query_infos = segs[0].split('@')
+                qid = int(query_infos[0])
+                uid = query_infos[1]
+                prev_qcount = int(query_infos[2])
+                context_emb = [float(x) for x in query_infos[3].split(',')]
+                qcontext_dic[qid] = context_emb
 
     # extract query-level features
     # document-level features ()

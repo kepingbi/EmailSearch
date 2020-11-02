@@ -45,10 +45,16 @@ class Trainer(object):
         logger.info('Start training...')
         # Set model in training mode.
         model_dir = args.save_dir
+        # cur_phase = "_ranker" if os.path.exists(self.args.train_from) else ""
+        cur_phase = ""
         valid_dataset = self.ExpDataset(args, global_data, "valid")
+        if self.args.model_name == "match_patterns":
+            valid_dataset.initialize_epoch()
         if self.args.eval_train:
             train_eval_dataset = self.ExpDataset(args, global_data, "train", for_test=True)
-        step_time, rel_loss, exam_loss = 0., 0., 0.
+            if self.args.model_name == "match_patterns":
+                train_eval_dataset.initialize_epoch()
+        step_time, rel_loss, exam_loss, context_loss = 0., 0., 0., 0.
         get_batch_time = 0.0
         start_time = time.time()
         current_step = 0
@@ -57,6 +63,12 @@ class Trainer(object):
         dataset = self.ExpDataset(args, global_data, "train")
         for current_epoch in range(args.start_epoch+1, args.max_train_epoch+1):
             self.model.train()
+            if self.args.model_name == "match_patterns":
+                train_ranker = current_epoch > self.args.start_ranker_epoch
+                dataset.initialize_epoch(train_ranker)
+                valid_dataset.set_get_ranker_batch(train_ranker)
+                if current_epoch == self.args.start_ranker_epoch + 1:
+                    best_ndcg = 0. # evaluate ranker instead of which user q-posd belongs to
             logger.info("Start epoch:%d\n" % current_epoch)
             dataloader = self.ExpDataloader(
                 args, dataset, batch_size=args.batch_size,
@@ -65,41 +77,57 @@ class Trainer(object):
             pbar.set_description("[Epoch {}]".format(current_epoch))
             time_flag = time.time()
             for batch_data in pbar:
-                batch_data = batch_data.to(args.device)
+                if dataset.train_ranker:
+                    pattern_batch, ranker_batch = batch_data
+                    batch_data = pattern_batch.to(args.device)
+                    ranker_batch = ranker_batch.to(args.device)
+                else:
+                    batch_data = batch_data.to(args.device)
+                    ranker_batch = None
                 if len(batch_data.query_idxs) == 0:
                     # if batch is empty
                     continue
                 get_batch_time += time.time() - time_flag
                 time_flag = time.time()
-                step_rel_loss, step_exam_loss = self.model(batch_data)
+                step_rel_loss, step_exam_loss, step_context_loss = self.model(
+                    batch_data, ranker_batch=ranker_batch)
                 #self.optim.optimizer.zero_grad()
                 self.model.zero_grad()
-                step_rel_loss.backward()
+                step_loss = None
+                if step_rel_loss is not None:
+                    step_loss = step_rel_loss
+                    # step_rel_loss.backward()
                 if step_exam_loss is not None:
                     step_exam_loss.backward()
-                    step_exam_loss = step_exam_loss.item()
-                else:
-                    step_exam_loss = 0.
+                if step_context_loss is not None:
+                    step_loss = step_context_loss if step_loss is None \
+                        else step_loss + step_context_loss * self.args.mix_rate
+                    # step_context_loss.backward()
+                step_loss.backward()
+                step_rel_loss = 0. if step_rel_loss is None else step_rel_loss.item()
+                step_exam_loss = 0. if step_exam_loss is None else step_exam_loss.item()
+                step_context_loss = 0. if step_context_loss is None else step_context_loss.item()
                 self.optim.step()
-                step_rel_loss = step_rel_loss.item()
                 pbar.set_postfix(step_rel_loss=step_rel_loss, \
-                    step_exam_loss=step_exam_loss, lr=self.optim.learning_rate)
+                    step_exam_loss=step_exam_loss, step_context_loss=step_context_loss,\
+                        lr=self.optim.learning_rate)
                 rel_loss += step_rel_loss / args.steps_per_checkpoint
                 exam_loss += step_exam_loss / args.steps_per_checkpoint
+                context_loss += step_context_loss / args.steps_per_checkpoint
                 current_step += 1
                 step_time += time.time() - time_flag
 
                 # Once in a while, we print statistics.
                 if current_step % args.steps_per_checkpoint == 0:
                     logger.info(
-                        "\n Epoch %d lr = %5.6f rel_loss = %6.2f exam_loss = %6.2f time %.2f \
-                        prepare_time %.2f step_time %.2f\n" %
-                        (current_epoch, self.optim.learning_rate, rel_loss, exam_loss,
+                        "\n Epoch %d lr = %5.6f rel_loss = %6.2f exam_loss = %6.2f context_loss = %6.2f \
+                            time %.2f prepare_time %.2f step_time %.2f\n" %
+                        (current_epoch, self.optim.learning_rate, rel_loss, exam_loss, context_loss,
                          time.time()-start_time, get_batch_time, step_time))#, end=""
-                    step_time, get_batch_time, rel_loss, exam_loss = 0., 0., 0., 0.
+                    step_time, get_batch_time, rel_loss, exam_loss, context_loss = 0., 0., 0., 0., 0.
                     sys.stdout.flush()
                     start_time = time.time()
-            checkpoint_path = os.path.join(model_dir, 'model_epoch_%d.ckpt' % current_epoch)
+            checkpoint_path = os.path.join(model_dir, 'model%s_epoch_%d.ckpt' % (cur_phase, current_epoch))
             self._save(current_epoch, checkpoint_path)
             mrr, prec, ndcg = self.validate(args, global_data, valid_dataset)
             logger.info("Epoch {}: Valid: NDCG:{} MRR:{} P@1:{}".format(
@@ -111,7 +139,7 @@ class Trainer(object):
                     current_epoch, train_ndcg, train_mrr, train_prec))
             if ndcg > best_ndcg:
                 best_ndcg = ndcg
-                best_checkpoint_path = os.path.join(model_dir, 'model_best.ckpt')
+                best_checkpoint_path = os.path.join(model_dir, 'model%s_best.ckpt' % cur_phase)
                 logger.info("Copying %s to checkpoint %s" % (checkpoint_path, best_checkpoint_path))
                 shutil.copyfile(checkpoint_path, best_checkpoint_path)
         return best_checkpoint_path
@@ -247,6 +275,10 @@ class Trainer(object):
              rankfname="test.best_model.ranklist",
              cutoff=50, coll_context_emb=False):
         test_dataset = self.ExpDataset(args, global_data, partition)
+        if self.args.model_name == "match_patterns":
+            test_dataset.initialize_epoch()
+            if self.args.max_train_epoch > self.args.start_ranker_epoch: # counted from 0
+                test_dataset.set_get_ranker_batch(True) # ranker has been trained and can be evaluated
         dataloader = self.ExpDataloader(
             args, test_dataset, batch_size=args.batch_size, #batch_size
             shuffle=False, num_workers=args.num_workers)
@@ -268,7 +300,8 @@ class Trainer(object):
                 user_id = global_data.user_idx_list[all_user_idxs[i]]
                 # all_user_idxs[i] is the mapped id, not the original id
                 qidx = all_query_idxs[i]
-                prev_qcount = all_context_qcounts[i] if args.model_name != "baseline" else 0
+                prev_qcount = all_context_qcounts[i] if args.model_name != "baseline" \
+                    and args.model_name != "mp_context" else 0
                 ranked_doc_ids = all_doc_idxs[i][sorted_doc_idxs[i]]
                 ranked_doc_scores = all_doc_scores[i][sorted_doc_idxs[i]]
                 if len(all_context_emb) > 0:
@@ -347,16 +380,21 @@ class Trainer(object):
             all_context_qcounts, all_context_emb, all_cluster_prob = [], [], []
             for batch_data in pbar:
                 batch_data = batch_data.to(args.device)
-                batch_scores, batch_context_emb, batch_cluster_prob = self.model.test(batch_data)
+                batch_scores, batch_context_emb, batch_cluster_prob = self.model.test(
+                    batch_data, test_ranker=dataloader.dataset.train_ranker)
                 #batch_size, candidate_doc_count
                 all_user_idxs.extend(batch_data.user_idxs.tolist())
                 all_query_idxs.extend(batch_data.query_idxs.tolist())
                 prev_qcount = []
-                if args.model_name != "baseline":
+                if args.model_name != "baseline" and args.model_name != "mp_context":
                     prev_qcount = batch_data.context_qidxs.ne(0).sum(dim=-1).cpu().tolist()
                 all_context_qcounts.extend(prev_qcount)
                 candi_doc_idxs = batch_data.candi_doc_idxs
                 candi_doc_ratings = batch_data.candi_doc_ratings
+                if len(candi_doc_ratings) == 0 and args.model_name == "match_patterns":
+                    candi_doc_ratings = torch.cat([torch.ones(candi_doc_idxs.size(0), 1), \
+                        torch.zeros(candi_doc_idxs.size(0), self.args.neg_k)], dim=-1)
+
                 if type(candi_doc_idxs) is torch.Tensor:
                     candi_doc_idxs = candi_doc_idxs.cpu()
                 all_doc_idxs.extend(candi_doc_idxs.tolist())

@@ -296,6 +296,7 @@ def read_meta_info(feat_name, qid_dic):
             segs = line.split('\t')
             item_type = int(segs[feat_name_dic['QueryLevelFeature_1997']])
             user_type = int(segs[feat_name_dic['QueryLevelFeature_2002']])
+            user_type = "Consumer" if user_type == 1 else "Commerical"
             q_lang_hash = int(segs[feat_name_dic['QueryLevelFeature_2001']])
             culture_lcid = int(segs[feat_name_dic['QueryLevelFeature_1999']])
             locale_lcid = int(segs[feat_name_dic['QueryLevelFeature_1998']])
@@ -469,7 +470,7 @@ def add_context_combination_to_file(\
     fout.close()
 
 
-def fit_tsne(context_matrix, df, figname=''):
+def fit_tsne(context_matrix, df, out_dir, figname=''):
     # feat_cols = ['feat'+str(i) for i in range(context_matrix.shape[1])]
     # df = pd.DataFrame(context_matrix, columns=feat_cols)
     # df['y'] = cluster_id_matrix
@@ -484,22 +485,27 @@ def fit_tsne(context_matrix, df, figname=''):
     tsne = TSNE(n_components=2, verbose=1, perplexity=40, n_iter=300)
     tsne_results = tsne.fit_transform(context_matrix)
     print('t-SNE done! Time elapsed: {} seconds'.format(time.time()-time_start))
-    df['tsne-2d-one'] = tsne_results[:, 0]
-    df['tsne-2d-two'] = tsne_results[:, 1]
+    df['t-SNE-2d-one'] = tsne_results[:, 0]
+    df['t-SNE-2d-two'] = tsne_results[:, 1]
     column_names = ["cluster_id", "item_type", "user_type", \
         "q_lang_hash", "culture_lcid", "locale_lcid", "action"]
+    out_dir = "%s/tsne_figs" % out_dir
+    os.makedirs(out_dir, exist_ok=True)
     for label in column_names:
         n_colors = len(np.unique(df[label]))
-        plt.figure(figsize=(16, 10))
+        # plt.figure(figsize=(16, 10))
+        plt.figure(figsize=(6.4, 4))
+        # plt.legend(fontsize='x-large') #, title_fontsize='40')
         sns.scatterplot(
-            x="tsne-2d-one", y="tsne-2d-two",
+            x="t-SNE-2d-one", y="t-SNE-2d-two",
             hue=label,
             palette=sns.color_palette("hls", n_colors),
             data=df,
             legend="full",
-            alpha=0.3
+            s=5,
+            alpha=0.8
         )
-        plt.savefig("tsne_figs/tsne_%s_%s%d.pdf" % (figname, label, n_colors))
+        plt.savefig("%s/tsne_%s_%s%d.pdf" % (out_dir, figname, label, n_colors))
 
 def cluster_context_emb(X, n_clusters, cluster_method="MiniBatchKmeans", way="hard"):
     """ cluster each context to clusters
@@ -622,6 +628,12 @@ def main():
             output_lightgbm_file(paras.feat_file, test_qset, test_feat_file)
 
     elif "add" in paras.option:
+        # test_rank_file = glob.glob("%s/test.context.best_model.*.ranklist.gz" % (paras.data_path))[0]
+        # valid_rank_file = glob.glob("%s/valid.context.best_model.*.ranklist.gz" % (paras.data_path))[0]
+        # train_rank_file = glob.glob("%s/train.context.best_model.*.ranklist.gz" % (paras.data_path))[0]
+        test_rank_file = os.path.join(paras.data_path, "test.context.best_model.prevq5.ranklist.gz")
+        valid_rank_file = os.path.join(paras.data_path, "valid.context.best_model.prevq5.ranklist.gz")
+        train_rank_file = os.path.join(paras.data_path, "train.context.best_model.prevq5.ranklist.gz")
         test_rank_file = os.path.join(paras.data_path, "test.context.best_model.ranklist.gz")
         valid_rank_file = os.path.join(paras.data_path, "valid.context.best_model.ranklist.gz")
         train_rank_file = os.path.join(paras.data_path, "train.context.best_model.ranklist.gz")
@@ -694,7 +706,7 @@ def main():
                     n_clusters = len(np.unique(qcontext_int_matrix))
                 if paras.show_tsne:
                     df["cluster_id"] = qcontext_int_matrix
-                    fit_tsne(context_emb_matrix, df, figname="%s_spl%d" % (fname, paras.sample_size))
+                    fit_tsne(context_emb_matrix, df, paras.data_path, figname="%s_spl%d" % (fname, paras.sample_size))
                     if paras.sample_size < len(qcontext_dic):
                         # do not perform adding context to feature file
                         return
@@ -703,14 +715,14 @@ def main():
             if paras.do_cluster == "combine":
                 add_context_combination_to_file(paras.feat_file, out_file, qcontext_int_matrix, qcontext_dic)
             else:
-                # if paras.do_cluster == "hard":
-                #     sparse_y = np.zeros((qcontext_int_matrix.shape[0], n_clusters), dtype=int)
-                #     sparse_y[np.expand_dims(np.arange(qcontext_int_matrix.shape[0]), -1), qcontext_int_matrix] = 1
-                #     qcontext_int_matrix = sparse_y
-                data_path = "/home/keping2/data/input/%s" % data_version
-                output_qu_cluster_id(paras.feat_file, data_path, paras.rank_dir, \
-                    qcontext_int_matrix, qcontext_dic)
-                return
+                if paras.do_cluster == "hard":
+                    sparse_y = np.zeros((qcontext_int_matrix.shape[0], n_clusters), dtype=int)
+                    sparse_y[np.expand_dims(np.arange(qcontext_int_matrix.shape[0]), -1), qcontext_int_matrix] = 1
+                    qcontext_int_matrix = sparse_y
+                # data_path = "/home/keping2/data/input/%s" % data_version
+                # output_qu_cluster_id(paras.feat_file, data_path, paras.rank_dir, \
+                #     qcontext_int_matrix, qcontext_dic)
+                # return
                 add_context_to_file(paras.feat_file, out_file, \
                     qcontext_int_matrix, qcontext_dic, feat_type="QContext")
                 

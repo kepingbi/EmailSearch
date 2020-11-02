@@ -185,6 +185,8 @@ RANKDIR_BASE_DIC = {"by_time": \
                "by_users": \
     CONTEXT_DIR + "by_users_embsize128_ff512_h8_layer2_lr0.002_ws3000_epoch10_lnorm1e-05_prevq10_posTrue_qTrue_dTrue_qdTrue_curqTrue", \
     # "/home/keping2/data/working/baseline/by_users_lr0.002_ws3000_epoch10_lnorm1e-05_qinterFalse_unbiasTrue"
+
+
     }
 
 

@@ -28,7 +28,7 @@ def calc_dcg(ranklist):
     return dcg_list
 
 def calc_ndcg(ranklist, iranklist, pos=10):
-    #TODO: iranklist = iranklist[:pos] #otherwise, the results may be smaller than it actually is
+    iranklist = iranklist[:pos] #otherwise, the results may be smaller than it actually is
     # Keep the numbers comparable, do not add this line back for now
     ranklist = ranklist[:pos]
     dcg = 0.0

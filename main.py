@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument('--seed', default=666, type=int)
     parser.add_argument("--train_from", default='')
     parser.add_argument("--model_name", default='pos_doc_context',
-                        choices=['pos_doc_context', 'baseline', 'clustering'],
+                        choices=['pos_doc_context', 'baseline', 'clustering', 'match_patterns', "mp_context"],
                         help="which type of model is used to train")
     parser.add_argument("--use_pos_emb", type=str2bool, nargs='?', const=True, default=True,
                         help="use positional embeddings when encoding historical queries with transformers.")
@@ -50,6 +50,8 @@ def parse_args():
                         help="use pos_weight different from 1 during training.")
     parser.add_argument("--l2_lambda", type=float, default=0.0,
                         help="The lambda for L2 regularization.")
+    parser.add_argument("--mix_rate", type=float, default=2.0,
+                        help="The mix rate of multiple training objectives.")
     parser.add_argument("--hist_len", type=int, default=0,
                         help="The filter criteron of user queries in the training set.")
     parser.add_argument("--filter_train", type=str2bool, nargs='?', const=True, default=False,
@@ -60,6 +62,8 @@ def parse_args():
                         help="Evaluate performances on training set as well.")
     parser.add_argument("--batch_size", type=int, default=128,
                         help="Batch size to use during training.")
+    parser.add_argument("--neg_k", type=int, default=10,
+                        help="Number of negative samples during training (users' Q-posD matching pattern).")
     parser.add_argument("--candi_doc_count", type=int, default=50, #
                         help="candidate documents for each query id. \
                         Result lists longer than 50 documents will be cutoff,\
@@ -76,6 +80,7 @@ def parse_args():
         help="For users with less history, only keep rnd_ratio of the data, can be 0")
     parser.add_argument("--save_dir", type=str, default="model",
                         help="Model directory & output directory")
+    parser.add_argument("--context_file_dir", default='model', help="directory that stores ranklists with context")
     parser.add_argument("--log_file", type=str, default="train.log",
                         help="log file name")
     parser.add_argument("--use_popularity", type=str2bool, nargs='?', const=True, default=False,
@@ -94,6 +99,9 @@ def parse_args():
                         help="Show document propensity according to the examination model.")
     parser.add_argument("--qinteract", type=str2bool, nargs='?', const=True, default=False,
                         help="Use query interact with all features or not for the baseline.")
+    parser.add_argument("--slice_k", default=4, type=int,
+                        help="slice of neural tensor machine")
+    parser.add_argument("--context_emb_size", type=int, default=32, help="Size of each context embedding.")
     parser.add_argument("--qfeat", type=str2bool, nargs='?', const=True, default=True,
                         help="Whether to include query-level features when encoding context.")
     parser.add_argument("--dfeat", type=str2bool, nargs='?', const=True, default=True,
@@ -141,6 +149,8 @@ def parse_args():
                         help="Limit on the epochs of training (0: no limit).")
     parser.add_argument("--start_epoch", type=int, default=0,
                         help="the epoch where we start training.")
+    parser.add_argument("--start_ranker_epoch", type=int, default=100000,
+                        help="the epoch where we start training ranker when training match_patterns.")
     parser.add_argument("--steps_per_checkpoint", type=int, default=200,
                         help="How many training steps to do per checkpoint.")
     parser.add_argument("--mode", type=str, default="train", choices=["train", "valid", "test"])
@@ -155,7 +165,7 @@ model_flags = ['embedding_size', 'ff_size', 'heads', 'inter_layers', \
 
 def create_model(args, global_data, load_path='', strict=True):
     """Create translation model and initialize or load parameters in session."""
-    if args.model_name == "baseline":
+    if args.model_name == "baseline" or args.model_name == "mp_context":
         model = BaseEmailRanker(args, global_data, args.device)
     else: #pos_doc_context, clustering
         model = ContextEmailRanker(args, global_data, args.device)
@@ -190,7 +200,9 @@ def train(args):
     personal_data = PersonalSearchData(args, args.input_dir)
 
     model, optim = create_model(args, personal_data, args.train_from)
-    trainer = Trainer(args, model, optim)
+    args.start_epoch = 0 # reset the start epoch for the second phase
+
+    trainer = Trainer(args, model, optim)    
     best_checkpoint_path = trainer.train(trainer.args, personal_data)
 
     best_model, _ = create_model(args, personal_data, best_checkpoint_path)
@@ -271,10 +283,10 @@ def get_doc_scores(args):
     coll_context_emb = True
     trainer.test(args, global_data, "test", \
         rankfname, coll_context_emb=coll_context_emb)
-    # trainer.test(args, global_data, "valid", \
-    #     rankfname.replace("test", "valid"), coll_context_emb=coll_context_emb)
-    # trainer.test(args, global_data, "train", \
-    #     rankfname.replace("test", "train"), coll_context_emb=coll_context_emb)
+    trainer.test(args, global_data, "valid", \
+        rankfname.replace("test", "valid"), coll_context_emb=coll_context_emb)
+    trainer.test(args, global_data, "train", \
+        rankfname.replace("test", "train"), coll_context_emb=coll_context_emb)
 
 def get_doc_clusters(args):
     global_data = PersonalSearchData(args, args.input_dir)
@@ -299,8 +311,6 @@ def main(args):
         args.test_prev_q_limit = args.prev_q_limit
     if args.mode == "train":
         assert args.prev_q_limit == args.test_prev_q_limit
-    if args.date_emb:
-        args.use_pos_emb = False
     if not os.path.isdir(args.save_dir):
         os.makedirs(args.save_dir)
     init_logger(os.path.join(args.save_dir, args.log_file))

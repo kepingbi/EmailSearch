@@ -11,8 +11,8 @@ WORKING_DIR = "~/data/working/%s" % (data_version)
 
 script_path = "python main.py"
 model_name = "pos_doc_context"
-AVAILABLE_CUDA_COUNT = 2
-START_NO = 1
+AVAILABLE_CUDA_COUNT = 4
+START_NO = 0
 
 #para_names = ["data_path", "use_popularity", "conv_occur", "doc_occur", \
 para_names = ["data_path", "embedding_size", \
@@ -26,8 +26,23 @@ paras = [
         # ("by_time", 128, 512, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, False, False, False, True),
         # ("by_users", 128, 512, 8, 2, 0.002, 3000, 10, 0.00001, 10, True, True, True, True, False, False, False, True),
 
-        ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, True, True, True, True, False, True, False, False, True),
-        ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, True, False, True, True, False, True, False, False, True),
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 15, True, True, True, True, True, False, False, False, False),
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, True, False, False, False, False),
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 8, True, True, True, True, True, False, False, False, False),
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 6, True, True, True, True, True, False, False, False, False),
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 4, True, True, True, True, True, False, False, False, False),
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 2, True, True, True, True, True, False, False, False, False),
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 0, True, True, True, True, True, False, False, False, False),
+
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 15, True, True, True, True, False, False, False, False, False),
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 10, True, True, True, True, False, False, False, False, False),
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 8, True, True, True, True, False, False, False, False, False),
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 6, True, True, True, True, False, False, False, False, False),
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 4, True, True, True, True, False, False, False, False, False),
+        ("by_time", 128, 8, 2, 0.002, 2000, 10, 0.00001, 2, True, True, True, True, False, False, False, False, False),
+
+        # ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, True, True, True, True, False, True, False, False, True),
+        # ("by_time", 32, 4, 2, 0.002, 2000, 10, 0.000005, 10, True, False, True, True, False, True, False, False, True),
 
         # ("by_time", 32, 4, 2, 0.002, 4000, 10, 0.00001, 10, True, True, True, True, False, True),
         # ("by_time", 32, 4, 2, 0.002, 3000, 10, 0.00001, 10, True, True, True, True, False, True),

@@ -6,7 +6,8 @@ import torch
 class DocContextBatch():
     ''' Contextual positive documents and queries.
     '''
-    def __init__(self, batch_qids, batch_user_idxs, candi_doc_idxs, candi_doc_ratings,
+    def __init__(self, batch_qids, batch_user_idxs,
+                 candi_doc_idxs, candi_doc_ratings,
                  candi_doc_rel_pos, candi_doc_time_pos,
                  candi_doc_qcont_features, candi_doc_qdiscrete_features,
                  candi_doc_dcont_features, candi_doc_ddiscrete_features,
@@ -119,9 +120,10 @@ class DocBaselineBatch(object):
                  candi_doc_qcont_features, candi_doc_qdiscrete_features,
                  candi_doc_dcont_features, candi_doc_ddiscrete_features,
                  candi_doc_qdcont_features,
-                 to_tensor=True): #"cpu" or "cuda"
+                 to_tensor=True, batch_qcontext_emb=None): #"cpu" or "cuda"
         self.query_idxs = batch_qids
         self.user_idxs = batch_user_idxs
+        self.qcontext_emb = batch_qcontext_emb
         self.candi_doc_idxs = candi_doc_idxs
         self.candi_doc_ratings = candi_doc_ratings
         self.candi_doc_rel_pos = candi_doc_rel_pos
@@ -138,6 +140,8 @@ class DocBaselineBatch(object):
     def to_tensor(self):
         self.query_idxs = torch.tensor(self.query_idxs)
         self.user_idxs = torch.tensor(self.user_idxs)
+        if self.qcontext_emb is not None:
+            self.qcontext_emb = torch.tensor(self.qcontext_emb)
         self.candi_doc_idxs = torch.tensor(self.candi_doc_idxs)
         self.candi_doc_ratings = torch.tensor(self.candi_doc_ratings)
         self.candi_doc_rel_pos = torch.tensor(self.candi_doc_rel_pos)
@@ -152,6 +156,7 @@ class DocBaselineBatch(object):
         if device == "cpu":
             return self
         else:
+            qcontext_emb = None if self.qcontext_emb is None else self.qcontext_emb.to(device)
             candi_doc_idxs = self.candi_doc_idxs.to(device)
             candi_doc_ratings = self.candi_doc_ratings.to(device)
             candi_doc_rel_pos = self.candi_doc_rel_pos.to(device)
@@ -168,4 +173,5 @@ class DocBaselineBatch(object):
                 candi_doc_rel_pos, candi_doc_time_pos,
                 candi_doc_qcont_features, candi_doc_qdiscrete_features,
                 candi_doc_dcont_features, candi_doc_ddiscrete_features,
-                candi_doc_qdcont_features, to_tensor=False)
+                candi_doc_qdcont_features, to_tensor=False,
+                batch_qcontext_emb=qcontext_emb)

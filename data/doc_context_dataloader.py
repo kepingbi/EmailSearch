@@ -21,7 +21,7 @@ class DocContextDataloader(DataLoader):
             pin_memory=pin_memory, drop_last=drop_last, timeout=timeout,
             worker_init_fn=worker_init_fn, collate_fn=self._collate_fn)
         self.args = args
-        random.seed(567)
+        random.seed(args.seed)
         # {"NotAppear":0, "Bad":1, "Fair":2, "Good":3, "Excellent":4, "Perfect":5}
         self.personal_data = self.dataset.personal_data
         self.doc_pad_idx = self.dataset.personal_data.doc_pad_idx
@@ -29,15 +29,21 @@ class DocContextDataloader(DataLoader):
         self.is_train = shuffle # when the data is shuffled, it is train batch
 
     def _collate_fn(self, batch):
-        if self.args.model_name == 'baseline':
-        # validation or test
+        if self.args.model_name == 'baseline' or self.args.model_name == "mp_context":
+            # validation or test
             return self.get_baseline_batch(batch)
-        return self.get_context_batch(batch)
+        if self.args.model_name == 'pos_doc_context':
+            return self.get_context_batch(batch)
+        if self.args.model_name == "match_patterns":
+            if not self.is_train and self.dataset.train_ranker:
+                batch_qids = [qid for qid, _ in batch]
+                return self.get_context_batch(batch_qids)
+            return self.get_context_pos_qd_batch(batch)
 
     def get_baseline_batch(self, batch_qids):
         ''' get batch for baseline (without context information)
         '''
-        batch_qids, batch_user_idxs, batch_candi_doc_idxs, batch_candi_doc_ratings, \
+        batch_qids, batch_user_idxs, batch_qcontext_emb, batch_candi_doc_idxs, batch_candi_doc_ratings, \
             batch_candi_doc_rel_pos, batch_candi_doc_time_pos, \
             batch_candi_doc_qcont_features, batch_candi_doc_qdiscrete_features, \
                 batch_candi_doc_dcont_features, batch_candi_doc_ddiscrete_features, \
@@ -49,7 +55,42 @@ class DocContextDataloader(DataLoader):
                                  batch_candi_doc_rel_pos, batch_candi_doc_time_pos,
                                  batch_candi_doc_qcont_features, batch_candi_doc_qdiscrete_features,
                                  batch_candi_doc_dcont_features, batch_candi_doc_ddiscrete_features,
-                                 batch_candi_doc_qdcont_features)
+                                 batch_candi_doc_qdcont_features, batch_qcontext_emb=batch_qcontext_emb)
+
+        return batch
+
+    def get_context_pos_qd_batch(self, batch_qids):
+        batch_qids, batch_user_idxs, batch_pos_doc_qids, \
+            batch_candi_doc_qcont_features, batch_candi_doc_qdiscrete_features, \
+                batch_candi_doc_dcont_features, batch_candi_doc_ddiscrete_features, \
+                    batch_candi_doc_qdcont_features \
+                        = self.collect_pos_neg_qd_pairs(batch_qids)
+
+        batch_context_qidxs, batch_context_search_time, batch_context_pos_didxs, \
+            batch_context_qcont_features, batch_context_qdiscrete_features, \
+                batch_context_pos_dcont_features, batch_context_pos_ddiscrete_features, \
+                    batch_context_pos_qdcont_features, batch_context_d_popularity, \
+                        batch_candi_doc_popularity, \
+                            batch_candi_conv_occur, batch_candi_doc_occur = \
+                        self.collect_context_data(batch_qids, batch_pos_doc_qids, \
+                            batch_pos_doc_qids)
+
+        batch = DocContextBatch(batch_qids, batch_user_idxs, batch_pos_doc_qids, [], [], [],
+                                batch_candi_doc_qcont_features, batch_candi_doc_qdiscrete_features,
+                                batch_candi_doc_dcont_features, batch_candi_doc_ddiscrete_features,
+                                batch_candi_doc_qdcont_features,
+                                batch_candi_doc_popularity,
+                                batch_candi_conv_occur, batch_candi_doc_occur,
+                                batch_context_qidxs, batch_context_search_time,
+                                batch_context_pos_didxs,
+                                batch_context_qcont_features, batch_context_qdiscrete_features,
+                                batch_context_pos_dcont_features,
+                                batch_context_pos_ddiscrete_features,
+                                batch_context_pos_qdcont_features,
+                                batch_context_d_popularity)
+        if self.dataset.train_ranker and self.is_train:
+            ranker_batch = self.get_baseline_batch(batch_qids)
+            return [batch, ranker_batch]
 
         return batch
 
@@ -62,7 +103,7 @@ class DocContextDataloader(DataLoader):
         # original features processed
         # features combined to represent d
 
-        batch_qids, batch_user_idxs, batch_candi_doc_idxs, batch_candi_doc_ratings, \
+        batch_qids, batch_user_idxs, batch_qcontext_emb, batch_candi_doc_idxs, batch_candi_doc_ratings, \
             batch_candi_doc_rel_pos, batch_candi_doc_time_pos, \
             batch_candi_doc_qcont_features, batch_candi_doc_qdiscrete_features, \
                 batch_candi_doc_dcont_features, batch_candi_doc_ddiscrete_features, \
@@ -103,18 +144,89 @@ class DocContextDataloader(DataLoader):
             batch.context_pos_dcont_features[:, :mask_out_count] = 0
             batch.context_pos_ddiscrete_features[:, :mask_out_count] = 0
             batch.context_pos_qdcont_features[:, :mask_out_count] = 0
-        # if self.args.test_prev_q_limit == 0:
-        #     batch.context_qidxs.fill_(0)
-        #     batch.context_search_time.fill_(self.days_pad_idx)
-        #     batch.context_pos_didxs.fill_(self.doc_pad_idx)
-        #     batch.context_qcont_features.fill_(0)
-        #     batch.context_qdiscrete_features.fill_(0)
-        #     batch.context_pos_dcont_features.fill_(0)
-        #     batch.context_pos_ddiscrete_features.fill_(0)
-        #     batch.context_pos_qdcont_features.fill_(0)
-        #     batch.candi_conv_occur.fill_(0)
-        #     batch.candi_doc_occur.fill_(0)
         return batch
+
+    def collect_pos_neg_qd_pairs(self, batch_qids):
+        # batch_qids should be (qid, [neg_qidxs])
+        new_batch_qids = []
+        batch_user_idxs = []
+        batch_pos_doc_qids = []
+        # candidate doc_ids, padded to args.candi_doc_count
+        batch_candi_doc_qcont_features, batch_candi_doc_qdiscrete_features = [], []
+        batch_candi_doc_dcont_features, batch_candi_doc_ddiscrete_features = [], []
+        batch_candi_doc_qdcont_features = []
+        for qid, neg_qidxs in batch_qids: #request id
+            cur_pos_didxs = self.personal_data.q_pos_didx_dic[qid] # idx in segs
+            candi_doc_rel_pos = [int(segs[self.personal_data.feature_name_dic['m:RelevancePosition']]) \
+                for segs in self.personal_data.query_info_dic[qid][:-1]]
+            if self.dataset.train_ranker and self.is_train and self.args.unbiased_train and candi_doc_rel_pos[0] != 1:
+                # if there is no document that appeared in either window under the query
+                # skip the query
+                # to match qids of the ranker. 
+                continue
+            if len(cur_pos_didxs) == 0:
+                continue
+            for pos_didx in cur_pos_didxs:
+                candi_doc_dcont_features, candi_doc_ddiscrete_features = [], []
+                candi_doc_qdcont_features = []
+                candi_doc_qcont_features, candi_doc_qdiscrete_features = [], []
+                new_batch_qids.append(qid)
+                cur_qidxs = [qid]
+                segs = self.personal_data.query_info_dic[qid][pos_didx]
+                query_cont_features, query_discrete_features, \
+                    doc_cont_features, doc_discrete_features, \
+                    qd_cont_features = self.personal_data.collect_group_features(
+                        segs, self.personal_data.feature_name_dic)
+                candi_doc_dcont_features.append(doc_cont_features)
+                candi_doc_ddiscrete_features.append(doc_discrete_features[:-1])
+                # conversation hash ([-1])
+                candi_doc_qdcont_features.append(qd_cont_features)
+                candi_doc_qcont_features.append(query_cont_features)
+                candi_doc_qdiscrete_features.append(query_discrete_features)
+                for neg_qid in neg_qidxs:
+                    neg_pos_didxs = self.personal_data.q_pos_didx_dic[neg_qid] # idx in segs
+                    if len(neg_pos_didxs) == 0:
+                        continue
+                    cur_qidxs.append(neg_qid)
+                    neg_pos_did = random.choice(neg_pos_didxs)
+                    segs = self.personal_data.query_info_dic[neg_qid][neg_pos_did]
+                    query_cont_features, query_discrete_features, \
+                        doc_cont_features, doc_discrete_features, \
+                        qd_cont_features = self.personal_data.collect_group_features(
+                            segs, self.personal_data.feature_name_dic)
+                    candi_doc_dcont_features.append(doc_cont_features)
+                    candi_doc_ddiscrete_features.append(doc_discrete_features[:-1])
+                    # conversation hash ([-1])
+                    candi_doc_qdcont_features.append(qd_cont_features)
+                    candi_doc_qcont_features.append(query_cont_features)
+                    candi_doc_qdiscrete_features.append(query_discrete_features)
+                batch_pos_doc_qids.append(cur_qidxs)
+                batch_candi_doc_qcont_features.append(candi_doc_qcont_features)
+                # batch_size, cont_feature_count
+                batch_candi_doc_qdiscrete_features.append(candi_doc_qdiscrete_features)
+                batch_candi_doc_dcont_features.append(candi_doc_dcont_features)
+                batch_candi_doc_ddiscrete_features.append(candi_doc_ddiscrete_features)
+                batch_candi_doc_qdcont_features.append(candi_doc_qdcont_features)
+
+        ##padding###
+        batch_user_idxs = [self.personal_data.query_info_dic[x][-1][0] for x in new_batch_qids]
+        #continous features pad float 0.0. discrete features pad 0.
+        batch_pos_doc_qids = util.pad(batch_pos_doc_qids, pad_id=-1, width=1+self.args.neg_k)
+        batch_candi_doc_qcont_features = util.pad_3d(
+            batch_candi_doc_qcont_features, pad_id=0., dim=1, width=1+self.args.neg_k)
+        batch_candi_doc_qdiscrete_features = util.pad_3d(
+            batch_candi_doc_qdiscrete_features, pad_id=0, dim=1, width=1+self.args.neg_k)
+        batch_candi_doc_dcont_features = util.pad_3d(
+            batch_candi_doc_dcont_features, pad_id=0., dim=1, width=1+self.args.neg_k)
+        batch_candi_doc_ddiscrete_features = util.pad_3d(
+            batch_candi_doc_ddiscrete_features, pad_id=0, dim=1, width=1+self.args.neg_k)
+        batch_candi_doc_qdcont_features = util.pad_3d(
+            batch_candi_doc_qdcont_features, pad_id=0., dim=1, width=1+self.args.neg_k)
+
+        return new_batch_qids, batch_user_idxs, batch_pos_doc_qids, \
+            batch_candi_doc_qcont_features, batch_candi_doc_qdiscrete_features, \
+                batch_candi_doc_dcont_features, batch_candi_doc_ddiscrete_features, \
+                    batch_candi_doc_qdcont_features
 
     def collect_candi_doc_data(self, batch_qids):
         # (dc1, dc2, ..., dcn)
@@ -173,6 +285,9 @@ class DocContextDataloader(DataLoader):
 
         ##padding###
         batch_user_idxs = [self.personal_data.query_info_dic[qid][-1][0] for qid in new_batch_qids]
+        batch_qcontext_emb = None
+        if hasattr(self.personal_data, "qcontext_dic"):
+            batch_qcontext_emb = [self.personal_data.qcontext_dic[qid] for qid in new_batch_qids]
 
         #continous features pad float 0.0. discrete features pad 0.
         batch_candi_doc_idxs = util.pad(batch_candi_doc_idxs, pad_id=self.doc_pad_idx, \
@@ -193,7 +308,7 @@ class DocContextDataloader(DataLoader):
         batch_candi_doc_qdcont_features = util.pad_3d(
             batch_candi_doc_qdcont_features, pad_id=0., dim=1, width=self.args.candi_doc_count)
 
-        return new_batch_qids, batch_user_idxs, batch_candi_doc_idxs, batch_candi_doc_ratings, \
+        return new_batch_qids, batch_user_idxs, batch_qcontext_emb, batch_candi_doc_idxs, batch_candi_doc_ratings, \
             batch_candi_doc_rel_pos, batch_candi_doc_time_pos, \
             batch_candi_doc_qcont_features, batch_candi_doc_qdiscrete_features, \
                 batch_candi_doc_dcont_features, batch_candi_doc_ddiscrete_features, \
@@ -220,9 +335,12 @@ class DocContextDataloader(DataLoader):
             #position of qid in the sequence of queries the user issued.
             all_prev_qidxs = self.personal_data.u_queries_dic[uid][:idx]
             if self.args.rand_prev:
-                sample_count = min(len(all_prev_qidxs), prev_q_limit)
-                prev_qidxs = random.sample(all_prev_qidxs, sample_count)
-                prev_qidxs.sort(key=lambda x: x[1])
+                all_prev_qidxs = self.personal_data.u_queries_dic[uid][:idx] \
+                    + self.personal_data.u_queries_dic[uid][idx+1:]
+                prev_qidxs = all_prev_qidxs[:prev_q_limit]
+                # sample_count = min(len(all_prev_qidxs), prev_q_limit)
+                # prev_qidxs = random.sample(all_prev_qidxs, sample_count)
+                # prev_qidxs.sort(key=lambda x: x[1])
             else:
                 prev_qidxs = all_prev_qidxs[-prev_q_limit:]
             cur_q_time = datetime.fromtimestamp(self.personal_data.u_queries_dic[uid][idx][1])
